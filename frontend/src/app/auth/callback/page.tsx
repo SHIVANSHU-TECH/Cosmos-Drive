@@ -2,8 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
-export default function OAuthCallback() {
+// Loading fallback component
+function OAuthCallbackLoading() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+        <p className="mt-4 text-gray-600">Loading authentication...</p>
+      </div>
+    </div>
+  );
+}
+
+function OAuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +53,14 @@ export default function OAuthCallback() {
         {error && <p className="mt-2 text-red-500">Error: {error}</p>}
       </div>
     </div>
+  );
+}
+
+export default function OAuthCallback() {
+  return (
+    <Suspense fallback={<OAuthCallbackLoading />}>
+      <OAuthCallbackContent />
+    </Suspense>
   );
 }
 
