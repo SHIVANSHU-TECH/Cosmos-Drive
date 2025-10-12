@@ -56,8 +56,23 @@ async function getOAuthTokens(code) {
     REDIRECT_URI
   );
   
-  const { tokens } = await oauth2Client.getToken(code);
-  return tokens;
+  try {
+    console.log('Exchanging code for tokens with Google OAuth service');
+    const { tokens } = await oauth2Client.getToken(code);
+    console.log('Successfully received tokens from Google OAuth service');
+    return tokens;
+  } catch (error) {
+    console.error('Error exchanging code for tokens:', error);
+    console.error('Error stack:', error.stack);
+    
+    if (error.message.includes('invalid_grant')) {
+      throw new Error('Authorization code has expired or already been used. Please try signing in again.');
+    } else if (error.message.includes('fetch failed') || error.code === 'ENOTFOUND') {
+      throw new Error('Failed to connect to Google OAuth service. Please check your network connection and try again.');
+    } else {
+      throw new Error('Failed to exchange authorization code for tokens: ' + error.message);
+    }
+  }
 }
 
 /**

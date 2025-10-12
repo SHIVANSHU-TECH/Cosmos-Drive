@@ -41,8 +41,12 @@ async function handleOAuthCallback(req, res) {
       return res.status(400).json({ error: 'Authorization code is required' });
     }
     
+    console.log('Exchanging authorization code for tokens:', code);
+    
     // Exchange authorization code for tokens
     const tokens = await driveService.getOAuthTokens(code);
+    
+    console.log('Successfully exchanged code for tokens:', tokens);
     
     // In a real application, you would store these tokens securely
     // For now, we'll just return them to the client
@@ -52,10 +56,14 @@ async function handleOAuthCallback(req, res) {
     });
   } catch (error) {
     console.error('Error handling OAuth callback:', error);
+    console.error('Error stack:', error.stack);
+    
     if (error.message === 'OAuth2 credentials not configured') {
       res.status(500).json({ error: 'OAuth2 is not properly configured. Please check your environment variables.' });
     } else if (error.message.includes('invalid_grant')) {
       res.status(400).json({ error: 'Authorization code has expired or already been used. Please try signing in again.' });
+    } else if (error.message.includes('fetch failed')) {
+      res.status(500).json({ error: 'Failed to connect to Google OAuth service. Please check your network connection and try again.' });
     } else {
       res.status(500).json({ error: 'Failed to authenticate: ' + error.message });
     }
