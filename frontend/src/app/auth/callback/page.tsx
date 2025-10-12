@@ -42,3 +42,5 @@ export default function OAuthCallback() {
     </div>
   );
 }
+
+export const dynamic = 'force-dynamic';
