@@ -23,14 +23,19 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const API_KEY = process.env.GOOGLE_API_KEY;
 
-// Configure CORS to allow requests from CollegeXConnect
+// Configure CORS to allow requests from any origin (for testing)
+// In production, you should specify the exact origins
 const corsOptions = {
-  origin: ['http://localhost:3000', 'https://collegexconnect.com', 'https://www.collegexconnect.com'],
+  origin: ['http://localhost:3000', 'https://collegexconnect.com', 'https://www.collegexconnect.com', 'https://cosmos-drive.vercel.app'],
+  credentials: true,
   optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
 app.use(express.json());
+
+// Add this middleware to handle preflight requests for all routes
+app.options('*', cors(corsOptions));
 
 // OAuth2 routes
 app.get('/api/auth/url', authController.getAuthUrl);
