@@ -40,8 +40,12 @@ export default function EmbedPage() {
           throw new Error('Missing required parameters: key and folderid');
         }
         
-        // Fetch files from our API
-        const response = await fetch(`/api/embed?key=${apiKey}&folderid=${folderId}&allowdl=${allowdl || 'yes'}`);
+        // Fetch files from our API using the correct endpoint
+        const response = await fetch(`/api/embed/folder/${folderId}`, {
+          headers: {
+            'X-API-Key': apiKey
+          }
+        });
         
         if (!response.ok) {
           const data = await response.json();
