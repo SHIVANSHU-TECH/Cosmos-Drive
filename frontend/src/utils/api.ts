@@ -2,27 +2,43 @@
 export const getBackendUrl = (): string => {
   // In production, use the NEXT_PUBLIC_BACKEND_URL environment variable
   // In development, default to localhost:3001
+  if (typeof window !== 'undefined') {
+    // Client-side check
+    console.log('Client-side environment variables:', {
+      NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL,
+      NODE_ENV: process.env.NODE_ENV
+    });
+  }
+  
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
-  console.log('Environment backend URL:', process.env.NEXT_PUBLIC_BACKEND_URL); // Debug log
-  console.log('Using backend URL:', backendUrl); // Debug log
+  console.log('Using backend URL:', backendUrl);
   return backendUrl;
 };
 
 export const getAuthUrl = async (): Promise<string> => {
   const backendUrl = getBackendUrl();
-  console.log('Backend URL:', backendUrl); // Debug log
   const url = `${backendUrl}/api/auth/url`;
-  console.log('Full URL:', url); // Debug log
+  console.log('Making request to:', url);
   
-  const response = await fetch(url);
-  
-  if (!response.ok) {
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to get authentication URL: ${response.status} ${response.statusText}`);
+    }
+    
     const data = await response.json();
-    throw new Error(data.error || 'Failed to get authentication URL');
+    return data.authUrl;
+  } catch (error) {
+    console.error('Error fetching auth URL:', error);
+    throw error;
   }
-  
-  const data = await response.json();
-  return data.authUrl;
 };
 
 export const fetchFiles = async (endpoint: string, folderId: string, token?: string, searchTerm?: string) => {
@@ -30,7 +46,9 @@ export const fetchFiles = async (endpoint: string, folderId: string, token?: str
   const searchParam = searchTerm ? `?search=${encodeURIComponent(searchTerm)}` : '';
   const url = `${backendUrl}/api/${endpoint}/drive/folder/${folderId}${searchParam}`;
   
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -49,7 +67,9 @@ export const fetchFolderPath = async (endpoint: string, folderId: string, token?
   const backendUrl = getBackendUrl();
   const url = `${backendUrl}/api/${endpoint}/drive/path/${folderId}`;
   
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -70,6 +90,7 @@ export const fetchEmbedFiles = async (folderId: string, apiKey: string) => {
   
   const response = await fetch(url, {
     headers: {
+      'Content-Type': 'application/json',
       'X-API-Key': apiKey
     }
   });

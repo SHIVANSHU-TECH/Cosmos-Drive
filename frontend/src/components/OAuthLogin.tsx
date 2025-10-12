@@ -14,14 +14,22 @@ export default function OAuthLogin() {
     setError(null);
     
     try {
-      console.log('Getting auth URL...'); // Debug log
-      console.log('Process env:', process.env); // Debug log
+      console.log('Getting auth URL...');
+      console.log('Current environment:', process.env.NODE_ENV);
+      console.log('Backend URL env var:', process.env.NEXT_PUBLIC_BACKEND_URL);
+      
       const authUrl = await getAuthUrl();
-      console.log('Auth URL:', authUrl); // Debug log
+      console.log('Received auth URL:', authUrl);
+      
+      if (!authUrl) {
+        throw new Error('Failed to get authentication URL');
+      }
+      
       window.location.href = authUrl;
     } catch (err) {
-      console.error('Error getting auth URL:', err); // Debug log
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Error getting auth URL:', err);
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred while getting the authentication URL';
+      setError(errorMessage);
       setIsLoading(false);
     }
   };
