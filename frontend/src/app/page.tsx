@@ -7,6 +7,7 @@ import OAuthLogin from '@/components/OAuthLogin';
 import DriveFileBrowser from '@/components/DriveFileBrowser';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { getBackendUrl } from '@/utils/api'; // Import the API utility function
 
 // Loading fallback component
 function HomePageLoading() {
@@ -69,11 +70,21 @@ function HomePageContent() {
 
   const exchangeCodeForTokens = async (code: string) => {
     try {
-      const response = await fetch(`/api/auth/callback?code=${encodeURIComponent(code)}`);
+      const backendUrl = getBackendUrl();
+      const url = `${backendUrl}/api/auth/callback?code=${encodeURIComponent(code)}`;
+      
+      console.log('Exchanging code for tokens at:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
       
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to authenticate');
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || `Failed to authenticate: ${response.status} ${response.statusText}`);
       }
       
       const data = await response.json();
@@ -87,6 +98,7 @@ function HomePageContent() {
         throw new Error('No access token received');
       }
     } catch (err) {
+      console.error('Error exchanging code for tokens:', err);
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
       setOauthError(errorMessage);
       // Remove the code from the URL
