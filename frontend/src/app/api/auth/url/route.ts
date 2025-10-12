@@ -4,7 +4,12 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   try {
     // Forward the request to our backend server
-    const backendUrl = `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/auth/url`;
+    const backendUrlEnv = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+    // Remove trailing slash if present
+    const cleanBackendUrl = backendUrlEnv.endsWith('/') ? backendUrlEnv.slice(0, -1) : backendUrlEnv;
+    const backendUrl = `${cleanBackendUrl}/api/auth/url`;
+    
+    console.log('Forwarding auth URL request to backend:', backendUrl);
     
     const response = await fetch(backendUrl);
     

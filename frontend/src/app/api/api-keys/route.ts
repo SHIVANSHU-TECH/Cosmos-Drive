@@ -15,7 +15,13 @@ export async function POST(request: Request) {
     }
 
     // Forward the request to the backend API
-    const backendResponse = await fetch(`${process.env.BACKEND_URL || 'http://localhost:3001'}/api/users/key`, {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+    // Remove trailing slash if present
+    const cleanBackendUrl = backendUrl.endsWith('/') ? backendUrl.slice(0, -1) : backendUrl;
+    
+    console.log('Forwarding API key request to backend:', `${cleanBackendUrl}/api/users/key`);
+    
+    const backendResponse = await fetch(`${cleanBackendUrl}/api/users/key`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -26,6 +32,11 @@ export async function POST(request: Request) {
     const data = await backendResponse.json();
 
     if (!backendResponse.ok) {
+      console.error('Backend API key creation failed:', {
+        status: backendResponse.status,
+        statusText: backendResponse.statusText,
+        data
+      });
       return NextResponse.json(
         { error: data.error || 'Failed to create API key' },
         { status: backendResponse.status }

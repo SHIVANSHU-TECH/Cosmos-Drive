@@ -17,7 +17,12 @@ export async function GET(request: Request) {
     const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
     
     // Forward the request to our backend server
-    const backendUrl = `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/auth/callback${queryString}`;
+    const backendUrlEnv = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+    // Remove trailing slash if present
+    const cleanBackendUrl = backendUrlEnv.endsWith('/') ? backendUrlEnv.slice(0, -1) : backendUrlEnv;
+    const backendUrl = `${cleanBackendUrl}/api/auth/callback${queryString}`;
+    
+    console.log('Forwarding OAuth callback request to backend:', backendUrl);
     
     const response = await fetch(backendUrl);
     
