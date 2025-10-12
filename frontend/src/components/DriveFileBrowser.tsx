@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import PdfViewer from '@/components/PdfViewer';
+import { fetchFiles, fetchFolderPath, getBackendUrl } from '@/utils/api'; // Import getBackendUrl
 
 interface DriveFile {
   id: string;
@@ -79,44 +80,10 @@ export default function DriveFileBrowser({ initialFolderId }: { initialFolderId:
       const endpoint = token ? 'private' : 'public';
       
       // Fetch files with search term
-      const searchParam = searchTerm ? `?search=${encodeURIComponent(searchTerm)}` : '';
-      const filesUrl = `/api/${endpoint}/drive/folder/${currentFolderId}${searchParam}`;
-      console.log('Fetching files from URL:', filesUrl);
-      
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      const filesResponse = await fetch(filesUrl, { headers });
-      
-      console.log('Files response status:', filesResponse.status);
-      
-      if (!filesResponse.ok) {
-        if (filesResponse.status === 401 || filesResponse.status === 403) {
-          logout(); // Log out the user if authentication fails
-          throw new Error('Authentication failed. Please log in again.');
-        }
-        throw new Error(`Failed to fetch files: ${filesResponse.status} ${filesResponse.statusText}`);
-      }
-      const filesData = await filesResponse.json();
+      const filesData = await fetchFiles(endpoint, currentFolderId, token || undefined, searchTerm);
       
       // Fetch folder path
-      const pathUrl = `/api/${endpoint}/drive/path/${currentFolderId}`;
-      console.log('Fetching path from URL:', pathUrl);
-      
-      const pathResponse = await fetch(pathUrl, { headers });
-      
-      console.log('Path response status:', pathResponse.status);
-      
-      if (!pathResponse.ok) {
-        if (pathResponse.status === 401 || pathResponse.status === 403) {
-          logout(); // Log out the user if authentication fails
-          throw new Error('Authentication failed. Please log in again.');
-        }
-        throw new Error(`Failed to fetch folder path: ${pathResponse.status} ${pathResponse.statusText}`);
-      }
-      const pathData = await pathResponse.json();
+      const pathData = await fetchFolderPath(endpoint, currentFolderId, token || undefined);
       
       setFiles(filesData);
       setFolderPath(pathData);
@@ -397,9 +364,10 @@ function GridView({ files, onFolderClick, openPdfPreview }: { files: DriveFile[]
   const getThumbnailUrl = (fileId: string) => {
     // Use private thumbnail endpoint if authenticated, otherwise public
     console.log('Getting thumbnail URL for file ID:', fileId, 'Authenticated:', !!token);
+    const backendUrl = getBackendUrl(); // Use the API utility function
     const url = token 
-      ? `/api/private/drive/thumbnail/${fileId}`
-      : `/api/public/drive/thumbnail/${fileId}`;
+      ? `${backendUrl}/api/private/drive/thumbnail/${fileId}`
+      : `${backendUrl}/api/public/drive/thumbnail/${fileId}`;
     console.log('Thumbnail URL:', url);
     return url;
   };
@@ -550,9 +518,10 @@ function TableView({ files, onFolderClick, onSort, sortConfig, openPdfPreview }:
   const getThumbnailUrl = (fileId: string) => {
     // Use private thumbnail endpoint if authenticated, otherwise public
     console.log('Getting thumbnail URL for file ID:', fileId, 'Authenticated:', !!token);
+    const backendUrl = getBackendUrl(); // Use the API utility function
     const url = token 
-      ? `/api/private/drive/thumbnail/${fileId}`
-      : `/api/public/drive/thumbnail/${fileId}`;
+      ? `${backendUrl}/api/private/drive/thumbnail/${fileId}`
+      : `${backendUrl}/api/public/drive/thumbnail/${fileId}`;
     console.log('Thumbnail URL:', url);
     return url;
   };

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
+import { getAuthUrl } from '@/utils/api';
 
 export default function OAuthLogin() {
   const [isLoading, setIsLoading] = useState(false);
@@ -13,23 +14,13 @@ export default function OAuthLogin() {
     setError(null);
     
     try {
-      const response = await fetch('/api/auth/url');
-      
-      // Check if response is JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        throw new Error(`Received non-JSON response from server: ${text.substring(0, 100)}...`);
-      }
-      
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to get authentication URL');
-      }
-      
-      const data = await response.json();
-      window.location.href = data.authUrl;
+      console.log('Getting auth URL...'); // Debug log
+      console.log('Process env:', process.env); // Debug log
+      const authUrl = await getAuthUrl();
+      console.log('Auth URL:', authUrl); // Debug log
+      window.location.href = authUrl;
     } catch (err) {
+      console.error('Error getting auth URL:', err); // Debug log
       setError(err instanceof Error ? err.message : 'An error occurred');
       setIsLoading(false);
     }

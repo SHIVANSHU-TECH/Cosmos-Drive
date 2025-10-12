@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { fetchEmbedFiles } from '@/utils/api';
 
 interface DriveFile {
   id: string;
@@ -42,18 +43,7 @@ function EmbedPageContent() {
         }
         
         // Fetch files from our API using the correct endpoint
-        const response = await fetch(`/api/embed/folder/${folderId}`, {
-          headers: {
-            'X-API-Key': apiKey
-          }
-        });
-        
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || 'Failed to fetch files');
-        }
-        
-        const data = await response.json();
+        const data = await fetchEmbedFiles(folderId, apiKey);
         setFiles(data.files || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');

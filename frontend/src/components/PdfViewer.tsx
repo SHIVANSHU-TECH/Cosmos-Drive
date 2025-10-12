@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/components/AuthProvider';
+import { getBackendUrl } from '@/utils/api'; // Import the API utility function
 
 // Dynamically import PDF.js to avoid SSR issues
 let pdfjsLib: any;
@@ -79,33 +80,77 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
       setError(null);
       console.log('Loading PDF from URL:', fileUrl);
       
-      // Prepare HTTP headers with authentication token
-      const httpHeaders: Record<string, string> = {};
-      if (token) {
-        httpHeaders['Authorization'] = `Bearer ${token}`;
+      // For PDF proxy URLs, we need to extract the file ID and use our API utility
+      if (fileUrl.startsWith('/api/private/drive/pdf/')) {
+        const fileId = fileUrl.split('/').pop();
+        if (!fileId) {
+          throw new Error('Invalid PDF URL');
+        }
+        
+        // Fetch PDF using our API utility function
+        const backendUrl = getBackendUrl();
+        const url = `${backendUrl}/api/private/drive/pdf/${fileId}`;
+        
+        const headers: Record<string, string> = {
+          'Authorization': `Bearer ${token}`
+        };
+        
+        const response = await fetch(url, { headers });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
+        }
+        
+        // Load PDF with the response
+        const loadingTask = pdfjsLib.getDocument({
+          data: await response.arrayBuffer()
+        });
+        
+        // Add progress tracking
+        loadingTask.onProgress = (progress: { loaded: number; total: number }) => {
+          console.log('PDF loading progress:', progress);
+        };
+        
+        const pdf = await loadingTask.promise;
+        pdfRef.current = pdf;
+        setNumPages(pdf.numPages);
+        console.log('PDF loaded with', pdf.numPages, 'pages');
+        
+        // Set initial scale based on device
+        const initialScale = isMobile ? 0.8 : 1.0;
+        setScale(initialScale);
+        
+        renderPage(pageNumber);
+      } else {
+        // For direct URLs, use the existing method
+        // Prepare HTTP headers with authentication token
+        const httpHeaders: Record<string, string> = {};
+        if (token) {
+          httpHeaders['Authorization'] = `Bearer ${token}`;
+        }
+        
+        // Load PDF with authentication headers
+        const loadingTask = pdfjsLib.getDocument({
+          url: fileUrl,
+          httpHeaders
+        });
+        
+        // Add progress tracking
+        loadingTask.onProgress = (progress: { loaded: number; total: number }) => {
+          console.log('PDF loading progress:', progress);
+        };
+        
+        const pdf = await loadingTask.promise;
+        pdfRef.current = pdf;
+        setNumPages(pdf.numPages);
+        console.log('PDF loaded with', pdf.numPages, 'pages');
+        
+        // Set initial scale based on device
+        const initialScale = isMobile ? 0.8 : 1.0;
+        setScale(initialScale);
+        
+        renderPage(pageNumber);
       }
-      
-      // Load PDF with authentication headers
-      const loadingTask = pdfjsLib.getDocument({
-        url: fileUrl,
-        httpHeaders
-      });
-      
-      // Add progress tracking
-      loadingTask.onProgress = (progress: { loaded: number; total: number }) => {
-        console.log('PDF loading progress:', progress);
-      };
-      
-      const pdf = await loadingTask.promise;
-      pdfRef.current = pdf;
-      setNumPages(pdf.numPages);
-      console.log('PDF loaded with', pdf.numPages, 'pages');
-      
-      // Set initial scale based on device
-      const initialScale = isMobile ? 0.8 : 1.0;
-      setScale(initialScale);
-      
-      renderPage(pageNumber);
     } catch (err) {
       const errorMessage = 'Failed to load PDF: ' + (err instanceof Error ? err.message : 'Unknown error');
       setError(errorMessage);
