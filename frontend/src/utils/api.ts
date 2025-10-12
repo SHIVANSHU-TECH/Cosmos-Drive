@@ -11,13 +11,15 @@ export const getBackendUrl = (): string => {
   }
   
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
-  console.log('Using backend URL:', backendUrl);
-  return backendUrl;
+  // Remove trailing slash if present
+  const cleanBackendUrl = backendUrl.endsWith('/') ? backendUrl.slice(0, -1) : backendUrl;
+  console.log('Using backend URL:', cleanBackendUrl);
+  return cleanBackendUrl;
 };
 
 export const getAuthUrl = async (): Promise<string> => {
   const backendUrl = getBackendUrl();
-  const url = `${backendUrl}/api/auth/url`;
+  const url = `${backendUrl}/api/auth/url`; // Add leading slash here
   console.log('Making request to:', url);
   
   try {

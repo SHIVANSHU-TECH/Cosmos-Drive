@@ -28,7 +28,14 @@ export default function OAuthLogin() {
       window.location.href = authUrl;
     } catch (err) {
       console.error('Error getting auth URL:', err);
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred while getting the authentication URL';
+      let errorMessage = 'An error occurred while getting the authentication URL';
+      
+      if (err instanceof TypeError && err.message === 'Failed to fetch') {
+        errorMessage = 'Network error: Unable to connect to the authentication server. Please check your internet connection and try again.';
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      
       setError(errorMessage);
       setIsLoading(false);
     }
