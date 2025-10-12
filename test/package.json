@@ -1,0 +1,16 @@
+{
+  "name": "drivepdf-embed-tests",
+  "version": "1.0.0",
+  "description": "Tests for the Google Drive Embed Tool",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "supertest": "^6.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node"
+  }
+}

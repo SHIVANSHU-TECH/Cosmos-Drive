@@ -1,0 +1,292 @@
+const driveService = require('../services/driveService');
+const ApiKeyService = require('../services/apiKeyService');
+
+/**
+ * Create a new API key for a user
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+async function createApiKey(req, res) {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+    
+    // Create a new user with API key
+    const user = ApiKeyService.createUser(email);
+    
+    res.status(201).json({
+      apiKey: user.apiKey,
+      email: user.email,
+      createdAt: user.createdAt
+    });
+  } catch (error) {
+    console.error('Error in createApiKey controller:', error);
+    res.status(500).json({ error: 'Failed to create API key: ' + error.message });
+  }
+}
+
+/**
+ * Add Google tokens to a user account
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+async function addGoogleTokens(req, res) {
+  try {
+    const { accessToken, refreshToken } = req.body;
+    const apiKey = req.headers['x-api-key'];
+    
+    if (!apiKey) {
+      return res.status(401).json({ 
+        error: 'API key required. Please provide your API key in the X-API-Key header.' 
+      });
+    }
+    
+    if (!accessToken || !refreshToken) {
+      return res.status(400).json({ 
+        error: 'Both access token and refresh token are required' 
+      });
+    }
+    
+    // Add tokens to user
+    const user = ApiKeyService.addGoogleTokensToUser(apiKey, accessToken, refreshToken);
+    
+    if (!user) {
+      return res.status(404).json({ 
+        error: 'User not found for the provided API key' 
+      });
+    }
+    
+    res.json({
+      message: 'Google tokens added successfully',
+      user: {
+        id: user.id,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('Error in addGoogleTokens controller:', error);
+    res.status(500).json({ error: 'Failed to add Google tokens: ' + error.message });
+  }
+}
+
+/**
+ * Get files from a folder
+ * This endpoint is designed to work with the CollegeXConnect integration
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+async function getFolderFiles(req, res) {
+  try {
+    // Get folder ID from params or query
+    const folderId = req.params.folderId || req.query.folderId;
+    
+    // Get API key from header (set by middleware)
+    const apiKey = req.headers['x-api-key'];
+    
+    if (!apiKey) {
+      return res.status(401).json({ 
+        error: 'API key required. Please provide your API key in the X-API-Key header.' 
+      });
+    }
+    
+    // Validate API key
+    const user = ApiKeyService.getUserByApiKey(apiKey);
+    if (!user) {
+      return res.status(403).json({ 
+        error: 'Invalid API key. Please check your API key and try again.' 
+      });
+    }
+    
+    console.log('Received request for folder ID:', folderId);
+    
+    if (!folderId) {
+      return res.status(400).json({ error: 'Folder ID is required' });
+    }
+    
+    let files;
+    // If user has Google tokens, use private access, otherwise fall back to public
+    if (user.hasGoogleTokens()) {
+      console.log('Using private access with user tokens');
+      try {
+        files = await driveService.getFilesFromFolderPrivate(user.googleAccessToken, folderId);
+      } catch (error) {
+        console.error('Error fetching files with private access:', error);
+        // If private access fails, fall back to public access
+        console.log('Falling back to public access');
+        files = await driveService.getFilesFromFolderPublic(folderId);
+      }
+    } else {
+      console.log('Using public access (user has no Google tokens)');
+      files = await driveService.getFilesFromFolderPublic(folderId);
+    }
+    
+    console.log('Files found:', files ? files.length : 0);
+    
+    // Return files with additional metadata
+    res.json({
+      folderId,
+      files: files || [],
+      user: {
+        id: user.id,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('Error in getFolderFiles controller:', error);
+    // Check if it's an authentication error
+    if (error.code === 401 || error.code === 403) {
+      return res.status(403).json({ error: 'Access denied. Invalid or missing credentials.' });
+    }
+    // Check if it's a "not found" error
+    if (error.code === 404) {
+      return res.status(404).json({ error: 'Folder not found.' });
+    }
+    res.status(500).json({ error: 'Failed to fetch files: ' + error.message });
+  }
+}
+
+/**
+ * Get files from a folder for embedded view
+ * This endpoint is designed to work with the Collegex Drive Embedder URL structure
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+async function getFolderForEmbed(req, res) {
+  try {
+    const { folderId } = req.params;
+    
+    // Get API key from header (set by frontend proxy)
+    const apiKey = req.headers['x-api-key'];
+    
+    if (!apiKey) {
+      return res.status(401).json({ 
+        error: 'API key required. Please provide your API key in the X-API-Key header.' 
+      });
+    }
+    
+    // Validate API key
+    const user = ApiKeyService.getUserByApiKey(apiKey);
+    if (!user) {
+      return res.status(403).json({ 
+        error: 'Invalid API key. Please check your API key and try again.' 
+      });
+    }
+    
+    console.log('Received embed request for folder ID:', folderId);
+    
+    if (!folderId) {
+      return res.status(400).json({ error: 'Folder ID is required' });
+    }
+    
+    let files;
+    // If user has Google tokens, use private access, otherwise fall back to public
+    if (user.hasGoogleTokens()) {
+      console.log('Using private access with user tokens');
+      try {
+        files = await driveService.getFilesFromFolderPrivate(user.googleAccessToken, folderId);
+      } catch (error) {
+        console.error('Error fetching files with private access:', error);
+        // If private access fails, fall back to public access
+        console.log('Falling back to public access');
+        files = await driveService.getFilesFromFolderPublic(folderId);
+      }
+    } else {
+      console.log('Using public access (user has no Google tokens)');
+      files = await driveService.getFilesFromFolderPublic(folderId);
+    }
+    
+    console.log('Files found:', files ? files.length : 0);
+    
+    // Return files with additional metadata for embedding
+    res.json({
+      folderId,
+      files: files || [],
+      user: {
+        id: user.id,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('Error in getFolderForEmbed controller:', error);
+    // Check if it's an authentication error
+    if (error.code === 401 || error.code === 403) {
+      return res.status(403).json({ error: 'Access denied. Invalid or missing credentials.' });
+    }
+    // Check if it's a "not found" error
+    if (error.code === 404) {
+      return res.status(404).json({ error: 'Folder not found.' });
+    }
+    res.status(500).json({ error: 'Failed to fetch files: ' + error.message });
+  }
+}
+
+/**
+ * Get file details for embedded view
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+async function getFileForEmbed(req, res) {
+  try {
+    const { fileId } = req.params;
+    
+    // Get API key from header (set by frontend proxy)
+    const apiKey = req.headers['x-api-key'];
+    
+    if (!apiKey) {
+      return res.status(401).json({ 
+        error: 'API key required. Please provide your API key in the X-API-Key header.' 
+      });
+    }
+    
+    // Validate API key
+    const user = ApiKeyService.getUserByApiKey(apiKey);
+    if (!user) {
+      return res.status(403).json({ 
+        error: 'Invalid API key. Please check your API key and try again.' 
+      });
+    }
+    
+    if (!fileId) {
+      return res.status(400).json({ error: 'File ID is required' });
+    }
+    
+    let file;
+    // If user has Google tokens, use private access, otherwise fall back to public
+    if (user.hasGoogleTokens()) {
+      try {
+        file = await driveService.getFileDetailsPrivate(user.googleAccessToken, fileId);
+      } catch (error) {
+        console.error('Error fetching file with private access:', error);
+        // If private access fails, fall back to public access
+        console.log('Falling back to public access');
+        file = await driveService.getFileDetailsPublic(fileId);
+      }
+    } else {
+      file = await driveService.getFileDetailsPublic(fileId);
+    }
+    
+    res.json(file);
+  } catch (error) {
+    console.error('Error in getFileForEmbed controller:', error);
+    // Check if it's an authentication error
+    if (error.code === 401 || error.code === 403) {
+      return res.status(403).json({ error: 'Access denied. Invalid or missing credentials.' });
+    }
+    // Check if it's a "not found" error
+    if (error.code === 404) {
+      return res.status(404).json({ error: 'File not found.' });
+    }
+    res.status(500).json({ error: 'Failed to fetch file details: ' + error.message });
+  }
+}
+
+module.exports = {
+  createApiKey,
+  addGoogleTokens,
+  getFolderFiles,
+  getFolderForEmbed,
+  getFileForEmbed
+};
