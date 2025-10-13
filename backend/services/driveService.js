@@ -139,6 +139,16 @@ async function getFilesFromFolderPublic(folderId, searchTerm = '') {
     return response.data.files || [];
   } catch (error) {
     console.error('Error fetching files from folder (public):', error);
+    
+    // Provide more specific error messages
+    if (error.code === 404) {
+      throw new Error('Folder not found. Please check the folder ID and ensure it is publicly accessible.');
+    } else if (error.code === 403) {
+      throw new Error('Access denied to folder. The folder may not be publicly shared or the API key may not have sufficient permissions.');
+    } else if (error.code === 401) {
+      throw new Error('Invalid API key. Please check your API key configuration.');
+    }
+    
     throw error;
   }
 }
@@ -276,6 +286,18 @@ async function getPublicPdfContent(fileId) {
     return response.data;
   } catch (error) {
     console.error('Error fetching public PDF content:', error);
+    
+    // Provide more specific error messages
+    if (error.code === 404) {
+      throw new Error('PDF file not found. Please check the file ID and ensure it is publicly accessible.');
+    } else if (error.code === 403) {
+      throw new Error('Access denied to PDF file. The file may not be publicly shared or the API key may not have sufficient permissions.');
+    } else if (error.code === 401) {
+      throw new Error('Invalid API key. Please check your API key configuration.');
+    } else if (error.code === 400) {
+      throw new Error('Invalid file type. Only PDF files can be previewed.');
+    }
+    
     throw error;
   }
 }

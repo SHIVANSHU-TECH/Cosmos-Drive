@@ -27,7 +27,13 @@ async function getFiles(req, res) {
     if (token) {
       // Use private access with user authentication
       console.log('Using private access with token');
-      files = await driveService.getFilesFromFolderPrivate(token, folderId, search);
+      try {
+        files = await driveService.getFilesFromFolderPrivate(token, folderId, search);
+      } catch (privateError) {
+        console.error('Error with private access, falling back to public access:', privateError);
+        // If private access fails, fall back to public access
+        files = await driveService.getFilesFromFolderPublic(folderId, search);
+      }
     } else {
       // Use public access
       console.log('Using public access');
@@ -41,6 +47,8 @@ async function getFiles(req, res) {
     // Check if it's an authentication error
     if (error.code === 401 || error.code === 403) {
       return res.status(403).json({ error: 'Access denied. Invalid or missing credentials.' });
+    } else if (error.code === 404) {
+      return res.status(404).json({ error: 'Folder not found.' });
     }
     res.status(500).json({ error: 'Failed to fetch files: ' + error.message });
   }
@@ -66,7 +74,13 @@ async function getFile(req, res) {
     let file;
     if (token) {
       // Use private access with user authentication
-      file = await driveService.getFileDetailsPrivate(token, fileId);
+      try {
+        file = await driveService.getFileDetailsPrivate(token, fileId);
+      } catch (privateError) {
+        console.error('Error with private access, falling back to public access:', privateError);
+        // If private access fails, fall back to public access
+        file = await driveService.getFileDetailsPublic(fileId);
+      }
     } else {
       // Use public access
       file = await driveService.getFileDetailsPublic(fileId);
@@ -78,6 +92,8 @@ async function getFile(req, res) {
     // Check if it's an authentication error
     if (error.code === 401 || error.code === 403) {
       return res.status(403).json({ error: 'Access denied. Invalid or missing credentials.' });
+    } else if (error.code === 404) {
+      return res.status(404).json({ error: 'File not found.' });
     }
     res.status(500).json({ error: 'Failed to fetch file details: ' + error.message });
   }
@@ -100,13 +116,29 @@ async function getFolderPath(req, res) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
     
-    const path = await driveService.getFolderPath(token, folderId);
+    let path;
+    if (token) {
+      // Use private access with user authentication
+      try {
+        path = await driveService.getFolderPath(token, folderId);
+      } catch (privateError) {
+        console.error('Error with private access, falling back to public access:', privateError);
+        // If private access fails, fall back to public access
+        path = await driveService.getFolderPath(null, folderId);
+      }
+    } else {
+      // Use public access
+      path = await driveService.getFolderPath(null, folderId);
+    }
+    
     res.json(path);
   } catch (error) {
     console.error('Error in getFolderPath controller:', error);
     // Check if it's an authentication error
     if (error.code === 401 || error.code === 403) {
       return res.status(403).json({ error: 'Access denied. Invalid or missing credentials.' });
+    } else if (error.code === 404) {
+      return res.status(404).json({ error: 'Folder not found.' });
     }
     res.status(500).json({ error: 'Failed to fetch folder path: ' + error.message });
   }
