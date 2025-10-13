@@ -87,6 +87,11 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
           throw new Error('Invalid PDF URL');
         }
         
+        // Check if we have a valid token
+        if (!token) {
+          throw new Error('Authentication required to view this PDF. Please log in to access this feature.');
+        }
+        
         // Fetch PDF using our API utility function
         const backendUrl = getBackendUrl();
         const url = `${backendUrl}/api/private/drive/pdf/${fileId}`;
@@ -98,6 +103,9 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
         const response = await fetch(url, { headers });
         
         if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            throw new Error('Access denied. Please log in to view this PDF.');
+          }
           throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
         }
         
@@ -334,6 +342,19 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
                 <span className="font-medium">Error:</span>
                 <span className="ml-2">{error}</span>
               </div>
+              {error.includes('Authentication required') && (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-600 mb-2">
+                    To view PDF files directly in the browser, you need to be logged in.
+                  </p>
+                  <a 
+                    href="/auth/login" 
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Log In
+                  </a>
+                </div>
+              )}
             </div>
           )}
           

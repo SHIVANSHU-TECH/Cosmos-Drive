@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { fetchEmbedFiles } from '@/utils/api';
 import PdfViewer from '@/components/PdfViewer';
+import { useAuth } from '@/components/AuthProvider';
 
 interface DriveFile {
   id: string;
@@ -27,6 +28,7 @@ function EmbedPageContent() {
   const [currentFolderId, setCurrentFolderId] = useState<string>('');
   const [folderPath, setFolderPath] = useState<Array<{id: string, name: string}>>([]);
   const searchParams = useSearchParams();
+  const { token, isAuthenticated } = useAuth();
 
   // Initialize with URL parameters
   useEffect(() => {
@@ -71,15 +73,17 @@ function EmbedPageContent() {
   };
 
   function openPdfPreview(file: DriveFile) {
-    // Use the PDF proxy instead of direct link
-    const pdfProxyUrl = `/api/private/drive/pdf/${file.id}`;
-    
-    // Set the PDF preview directly without checking first
-    // The PDF viewer will handle any errors
-    setPdfPreview({
-      url: pdfProxyUrl,
-      name: file.name
-    });
+    // For authenticated users, use the PDF proxy
+    if (isAuthenticated && token) {
+      const pdfProxyUrl = `/api/private/drive/pdf/${file.id}`;
+      setPdfPreview({
+        url: pdfProxyUrl,
+        name: file.name
+      });
+    } else {
+      // For unauthenticated users, open in new tab
+      window.open(file.webViewLink, '_blank');
+    }
   }
 
   function closePdfPreview() {
@@ -260,7 +264,7 @@ function EmbedPageContent() {
                         onClick={() => openPdfPreview(file)}
                         className="flex-1 min-w-[80px] text-center px-3 py-1.5 text-sm font-medium bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
                       >
-                        Preview
+                        {isAuthenticated && token ? 'Preview' : 'View'}
                       </button>
                     ) : file.mimeType !== 'application/vnd.google-apps.folder' && allowDownload && file.webContentLink ? (
                       <a
