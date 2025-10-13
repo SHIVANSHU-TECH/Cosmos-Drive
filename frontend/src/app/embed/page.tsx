@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { fetchEmbedFiles } from '@/utils/api';
+import PdfViewer from '@/components/PdfViewer';
 
 interface DriveFile {
   id: string;
@@ -22,41 +23,90 @@ function EmbedPageContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allowDownload, setAllowDownload] = useState(true);
+  const [pdfPreview, setPdfPreview] = useState<{ url: string; name: string } | null>(null);
+  const [currentFolderId, setCurrentFolderId] = useState<string>('');
+  const [folderPath, setFolderPath] = useState<Array<{id: string, name: string}>>([]);
   const searchParams = useSearchParams();
 
+  // Initialize with URL parameters
   useEffect(() => {
-    const fetchFiles = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Get parameters from URL
-        const apiKey = searchParams.get('key');
-        const folderId = searchParams.get('folderid');
-        const allowdl = searchParams.get('allowdl');
-        
-        // Set download permission
-        setAllowDownload(allowdl !== 'no');
-        
-        if (!apiKey || !folderId) {
-          throw new Error('Missing required parameters: key and folderid');
-        }
-        
-        // Fetch files from our API using the correct endpoint
-        const data = await fetchEmbedFiles(folderId, apiKey);
-        setFiles(data.files || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
-      }
-    };
+    const apiKey = searchParams.get('key');
+    const folderId = searchParams.get('folderid');
+    const allowdl = searchParams.get('allowdl');
     
-    fetchFiles();
+    if (apiKey && folderId) {
+      setAllowDownload(allowdl !== 'no');
+      setCurrentFolderId(folderId);
+      setFolderPath([{id: folderId, name: 'Root'}]); // Initialize with root folder
+    }
   }, [searchParams]);
 
+  // Fetch files when currentFolderId changes
+  useEffect(() => {
+    if (currentFolderId) {
+      fetchFiles();
+    }
+  }, [currentFolderId]);
+
+  const fetchFiles = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Get API key from URL parameters
+      const apiKey = searchParams.get('key');
+      
+      if (!apiKey) {
+        throw new Error('API key is required');
+      }
+      
+      // Fetch files from our API using the correct endpoint
+      const data = await fetchEmbedFiles(currentFolderId, apiKey);
+      setFiles(data.files || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  function openPdfPreview(file: DriveFile) {
+    // Use the PDF proxy instead of direct link
+    const pdfProxyUrl = `/api/private/drive/pdf/${file.id}`;
+    
+    // Set the PDF preview directly without checking first
+    // The PDF viewer will handle any errors
+    setPdfPreview({
+      url: pdfProxyUrl,
+      name: file.name
+    });
+  }
+
+  function closePdfPreview() {
+    setPdfPreview(null);
+  }
+
+  function navigateToFolder(folderId: string, folderName: string) {
+    // Update current folder ID to trigger file fetch
+    setCurrentFolderId(folderId);
+    
+    // Update folder path for breadcrumb navigation
+    const newPath = [...folderPath];
+    newPath.push({id: folderId, name: folderName});
+    setFolderPath(newPath);
+  }
+
+  function navigateToParentFolder(index: number) {
+    // Navigate back to a parent folder by index
+    if (index >= 0 && index < folderPath.length) {
+      const newPath = folderPath.slice(0, index + 1);
+      setFolderPath(newPath);
+      setCurrentFolderId(newPath[newPath.length - 1].id);
+    }
+  }
+
   // Show loading state
-  if (loading) {
+  if (loading && files.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -68,7 +118,7 @@ function EmbedPageContent() {
   }
 
   // Show error state
-  if (error) {
+  if (error && files.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
@@ -82,6 +132,14 @@ function EmbedPageContent() {
             <div className="mt-2 text-sm text-gray-500">
               <p>{error}</p>
             </div>
+            <div className="mt-4">
+              <button
+                onClick={fetchFiles}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -90,12 +148,76 @@ function EmbedPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
+      {/* PDF Viewer Modal */}
+      {pdfPreview && (
+        <PdfViewer 
+          fileUrl={pdfPreview.url} 
+          fileName={pdfPreview.name} 
+          onClose={closePdfPreview} 
+        />
+      )}
+      
       <div className="max-w-6xl mx-auto">
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          {/* Breadcrumb Navigation */}
+          {folderPath.length > 1 && (
+            <div className="p-3 bg-gray-100 border-b border-gray-200">
+              <nav className="flex overflow-x-auto" aria-label="Breadcrumb">
+                <ol className="inline-flex items-center space-x-1 md:space-x-2">
+                  {folderPath.map((folder, index) => (
+                    <li key={folder.id} className="inline-flex items-center">
+                      {index > 0 && (
+                        <svg className="w-4 h-4 mx-1 text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 6 10">
+                          <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 9 4-4-4-4"/>
+                        </svg>
+                      )}
+                      <button
+                        onClick={() => navigateToParentFolder(index)}
+                        className={`inline-flex items-center text-sm font-medium ${
+                          index === folderPath.length - 1 
+                            ? 'text-gray-500 cursor-default' 
+                            : 'text-blue-600 hover:underline'
+                        }`}
+                        disabled={index === folderPath.length - 1}
+                      >
+                        {folder.name}
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+              </nav>
+            </div>
+          )}
+          
           <div className="p-4 border-b border-gray-200">
             <h1 className="text-xl font-semibold text-gray-800">Drive File Browser</h1>
             <p className="text-sm text-gray-600 mt-1">Files in this folder</p>
           </div>
+          
+          {/* Loading indicator for navigation */}
+          {loading && files.length > 0 && (
+            <div className="p-4 bg-blue-50 text-blue-700 text-center">
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-700 mr-2"></div>
+                <span>Loading folder contents...</span>
+              </div>
+            </div>
+          )}
+          
+          {/* Error indicator for navigation */}
+          {error && files.length > 0 && (
+            <div className="p-4 bg-red-50 text-red-700">
+              <div className="flex items-center justify-between">
+                <span>Error: {error}</span>
+                <button
+                  onClick={fetchFiles}
+                  className="px-3 py-1 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition-colors"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          )}
           
           {files.length === 0 ? (
             <div className="p-8 text-center">
@@ -115,16 +237,32 @@ function EmbedPageContent() {
                   </div>
                   
                   <div className="flex flex-wrap gap-2 mt-4">
-                    <a 
-                      href={file.webViewLink} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="flex-1 min-w-[80px] text-center px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                    >
-                      View
-                    </a>
+                    {file.mimeType === 'application/vnd.google-apps.folder' ? (
+                      <button
+                        onClick={() => navigateToFolder(file.id, file.name)}
+                        className="flex-1 min-w-[80px] text-center px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                      >
+                        Open
+                      </button>
+                    ) : (
+                      <a 
+                        href={file.webViewLink} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex-1 min-w-[80px] text-center px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                      >
+                        View
+                      </a>
+                    )}
                     
-                    {allowDownload && file.webContentLink && (
+                    {file.mimeType === 'application/pdf' ? (
+                      <button
+                        onClick={() => openPdfPreview(file)}
+                        className="flex-1 min-w-[80px] text-center px-3 py-1.5 text-sm font-medium bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                      >
+                        Preview
+                      </button>
+                    ) : file.mimeType !== 'application/vnd.google-apps.folder' && allowDownload && file.webContentLink ? (
                       <a
                         href={file.webContentLink}
                         target="_blank"
@@ -133,7 +271,7 @@ function EmbedPageContent() {
                       >
                         Download
                       </a>
-                    )}
+                    ) : null}
                   </div>
                   
                   {file.size && (
