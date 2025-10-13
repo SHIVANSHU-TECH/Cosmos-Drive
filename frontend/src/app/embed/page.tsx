@@ -29,6 +29,11 @@ function EmbedPageContent() {
   const [folderPath, setFolderPath] = useState<Array<{id: string, name: string}>>([]);
   const searchParams = useSearchParams();
   const { token, isAuthenticated } = useAuth();
+  
+  // Debug authentication state
+  useEffect(() => {
+    console.log('Embed page auth state:', { isAuthenticated, token });
+  }, [isAuthenticated, token]);
 
   // Initialize with URL parameters
   useEffect(() => {
@@ -73,6 +78,7 @@ function EmbedPageContent() {
   };
 
   function openPdfPreview(file: DriveFile) {
+    console.log('Opening PDF preview, auth state:', { isAuthenticated, token });
     // For authenticated users, use the private PDF proxy
     if (isAuthenticated && token) {
       const pdfProxyUrl = `/api/private/drive/pdf/${file.id}`;
@@ -156,6 +162,11 @@ function EmbedPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
+      {/* Debug authentication state */}
+      <div className="p-2 bg-yellow-100 text-yellow-800 text-xs">
+        Debug: isAuthenticated={isAuthenticated ? 'true' : 'false'}, token={token ? 'present' : 'null'}
+      </div>
+      
       {/* PDF Viewer Modal */}
       {pdfPreview && (
         <PdfViewer 

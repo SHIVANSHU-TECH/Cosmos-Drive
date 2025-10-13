@@ -29,6 +29,12 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
   const pdfRef = useRef<any>(null);
   const [isMobile, setIsMobile] = useState(false);
   const { token } = useAuth();
+  
+  // Debug the received URL and auth state
+  useEffect(() => {
+    console.log('PdfViewer received props:', { fileUrl, fileName });
+    console.log('PdfViewer auth state:', { token });
+  }, [fileUrl, fileName, token]);
 
   useEffect(() => {
     // Check if device is mobile
@@ -91,6 +97,9 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
         const backendUrl = getBackendUrl();
         const url = `${backendUrl}${fileUrl}`;
       
+        console.log('Fetching PDF with URL:', url);
+        console.log('Using auth state:', { token, isPrivate: fileUrl.startsWith('/api/private/drive/pdf/') });
+      
         const headers: Record<string, string> = {};
         // Add authorization header only for private routes
         if (fileUrl.startsWith('/api/private/drive/pdf/')) {
@@ -102,18 +111,31 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
       
         const response = await fetch(url, { headers });
       
+        console.log('PDF fetch response status:', response.status);
+      
         if (!response.ok) {
+          let errorMessage = `Failed to fetch PDF: ${response.status} ${response.statusText}`;
+          
+          // Try to get error details from response
+          try {
+            const errorData = await response.json();
+            if (errorData.error) {
+              errorMessage = errorData.error;
+            }
+          } catch (e) {
+            // Ignore JSON parsing errors
+          }
+          
           if (response.status === 401 || response.status === 403) {
             throw new Error('Access denied. Please log in to view this PDF.');
           } else if (response.status === 400) {
-            const data = await response.json();
-            throw new Error(data.error || 'Invalid file type. Only PDF files can be previewed.');
+            throw new Error(errorMessage || 'Invalid file type. Only PDF files can be previewed.');
           } else if (response.status === 404) {
             throw new Error('PDF file not found.');
           } else if (response.status === 500) {
             throw new Error('Server error occurred while fetching the PDF. Please try again later.');
           }
-          throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
+          throw new Error(errorMessage);
         }
       
         // Load PDF with the response
@@ -178,7 +200,7 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
     } finally {
       setLoading(false);
     }
-};
+  };
 
   const renderPage = async (pageNum: number) => {
     if (!pdfRef.current || !canvasRef.current) return;
