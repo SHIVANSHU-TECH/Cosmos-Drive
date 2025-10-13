@@ -81,53 +81,60 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
       console.log('Loading PDF from URL:', fileUrl);
       
       // For PDF proxy URLs, we need to extract the file ID and use our API utility
-      if (fileUrl.startsWith('/api/private/drive/pdf/')) {
+      if (fileUrl.startsWith('/api/private/drive/pdf/') || fileUrl.startsWith('/api/public/drive/pdf/')) {
         const fileId = fileUrl.split('/').pop();
         if (!fileId) {
           throw new Error('Invalid PDF URL');
         }
-        
-        // Check if we have a valid token
-        if (!token) {
-          throw new Error('Authentication required to view this PDF. Please log in to access this feature.');
-        }
-        
+      
         // Fetch PDF using our API utility function
         const backendUrl = getBackendUrl();
-        const url = `${backendUrl}/api/private/drive/pdf/${fileId}`;
-        
-        const headers: Record<string, string> = {
-          'Authorization': `Bearer ${token}`
-        };
-        
+        const url = `${backendUrl}${fileUrl}`;
+      
+        const headers: Record<string, string> = {};
+        // Add authorization header only for private routes
+        if (fileUrl.startsWith('/api/private/drive/pdf/')) {
+          if (!token) {
+            throw new Error('Authentication required to view this PDF. Please log in to access this feature.');
+          }
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+      
         const response = await fetch(url, { headers });
-        
+      
         if (!response.ok) {
           if (response.status === 401 || response.status === 403) {
             throw new Error('Access denied. Please log in to view this PDF.');
+          } else if (response.status === 400) {
+            const data = await response.json();
+            throw new Error(data.error || 'Invalid file type. Only PDF files can be previewed.');
+          } else if (response.status === 404) {
+            throw new Error('PDF file not found.');
+          } else if (response.status === 500) {
+            throw new Error('Server error occurred while fetching the PDF. Please try again later.');
           }
           throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
         }
-        
+      
         // Load PDF with the response
         const loadingTask = pdfjsLib.getDocument({
           data: await response.arrayBuffer()
         });
-        
+      
         // Add progress tracking
         loadingTask.onProgress = (progress: { loaded: number; total: number }) => {
           console.log('PDF loading progress:', progress);
         };
-        
+      
         const pdf = await loadingTask.promise;
         pdfRef.current = pdf;
         setNumPages(pdf.numPages);
         console.log('PDF loaded with', pdf.numPages, 'pages');
-        
+      
         // Set initial scale based on device
         const initialScale = isMobile ? 0.8 : 1.0;
         setScale(initialScale);
-        
+      
         renderPage(pageNumber);
       } else {
         // For direct URLs, use the existing method
@@ -136,34 +143,34 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
         if (token) {
           httpHeaders['Authorization'] = `Bearer ${token}`;
         }
-        
+      
         // Load PDF with authentication headers
         const loadingTask = pdfjsLib.getDocument({
           url: fileUrl,
           httpHeaders
         });
-        
+      
         // Add progress tracking
         loadingTask.onProgress = (progress: { loaded: number; total: number }) => {
           console.log('PDF loading progress:', progress);
         };
-        
+      
         const pdf = await loadingTask.promise;
         pdfRef.current = pdf;
         setNumPages(pdf.numPages);
         console.log('PDF loaded with', pdf.numPages, 'pages');
-        
+      
         // Set initial scale based on device
         const initialScale = isMobile ? 0.8 : 1.0;
         setScale(initialScale);
-        
+      
         renderPage(pageNumber);
       }
     } catch (err) {
       const errorMessage = 'Failed to load PDF: ' + (err instanceof Error ? err.message : 'Unknown error');
       setError(errorMessage);
       console.error('PDF loading error:', err);
-      
+    
       // Additional error details for debugging
       if (err && typeof err === 'object' && 'status' in err) {
         console.error('Error status:', (err as any).status);
@@ -171,7 +178,7 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
     } finally {
       setLoading(false);
     }
-  };
+};
 
   const renderPage = async (pageNum: number) => {
     if (!pdfRef.current || !canvasRef.current) return;

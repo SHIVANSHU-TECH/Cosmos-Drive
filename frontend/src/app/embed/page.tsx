@@ -73,7 +73,7 @@ function EmbedPageContent() {
   };
 
   function openPdfPreview(file: DriveFile) {
-    // For authenticated users, use the PDF proxy
+    // For authenticated users, use the private PDF proxy
     if (isAuthenticated && token) {
       const pdfProxyUrl = `/api/private/drive/pdf/${file.id}`;
       setPdfPreview({
@@ -81,8 +81,12 @@ function EmbedPageContent() {
         name: file.name
       });
     } else {
-      // For unauthenticated users, open in new tab
-      window.open(file.webViewLink, '_blank');
+      // For unauthenticated users, use the public PDF proxy
+      const pdfProxyUrl = `/api/public/drive/pdf/${file.id}`;
+      setPdfPreview({
+        url: pdfProxyUrl,
+        name: file.name
+      });
     }
   }
 
