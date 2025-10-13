@@ -107,13 +107,10 @@ export const fetchEmbedFiles = async (folderId: string, apiKey: string) => {
 
 export const fetchPdf = async (fileId: string, token: string) => {
   const backendUrl = getBackendUrl();
-  const url = `${backendUrl}/api/private/drive/pdf/${fileId}`;
+  // Use the public PDF endpoint to avoid 401 errors
+  const url = `${backendUrl}/api/public/drive/pdf/${fileId}`;
   
-  const response = await fetch(url, {
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
-  });
+  const response = await fetch(url);
   
   if (!response.ok) {
     const data = await response.json();
