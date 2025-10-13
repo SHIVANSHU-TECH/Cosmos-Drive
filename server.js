@@ -3,9 +3,52 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
+const fs = require('fs');
 
 // Load environment variables
-dotenv.config();
+console.log('Current working directory:', process.cwd());
+console.log('Directory contents:', fs.readdirSync(process.cwd()));
+
+// Try to load .env.local first, then .env
+const envLocalPath = path.resolve(process.cwd(), '.env.local');
+const envPath = path.resolve(process.cwd(), '.env');
+
+console.log('Checking for .env.local at:', envLocalPath);
+console.log('.env.local exists:', fs.existsSync(envLocalPath));
+
+console.log('Checking for .env at:', envPath);
+console.log('.env exists:', fs.existsSync(envPath));
+
+if (fs.existsSync(envLocalPath)) {
+  console.log('Loading .env.local file...');
+  const resultLocal = dotenv.config({ path: envLocalPath });
+  if (resultLocal.error) {
+    console.log('Error loading .env.local file:', resultLocal.error.message);
+  } else {
+    console.log('.env.local file loaded successfully');
+  }
+} else {
+  console.log('No .env.local file found');
+}
+
+// Load .env file as fallback
+if (fs.existsSync(envPath)) {
+  console.log('Loading .env file...');
+  const result = dotenv.config({ path: envPath });
+  if (result.error) {
+    console.log('Error loading .env file:', result.error.message);
+  } else {
+    console.log('.env file loaded successfully');
+  }
+} else {
+  console.log('No .env file found');
+}
+
+console.log('Environment variables after loading:');
+console.log('GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET');
+console.log('GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET');
+console.log('REDIRECT_URI:', process.env.REDIRECT_URI);
+console.log('PORT:', process.env.PORT);
 
 // Import controllers
 const driveController = require('./backend/controllers/driveController');
@@ -23,8 +66,9 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const API_KEY = process.env.GOOGLE_API_KEY;
 
-// Configure CORS to allow requests from any origin (for testing)
-// In production, you should specify the exact origins
+console.log('API_KEY:', API_KEY ? 'SET' : 'NOT SET');
+
+// Configure CORS to allow requests from CollegeXConnect
 const corsOptions = {
   origin: ['http://localhost:3000', 'https://collegexconnect.com', 'https://www.collegexconnect.com', 'https://cosmos-drive.vercel.app'],
   credentials: true,
@@ -214,6 +258,86 @@ app.get('/api/private/drive/thumbnail/:fileId', authenticateToken, async (req, r
   }
 });
 
+// Public PDF proxy route (no authentication required for public files)
+app.get('/api/public/drive/pdf/:fileId', async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    
+    console.log('Public PDF proxy request for file ID:', fileId);
+    
+    // Check if API_KEY is available
+    if (!API_KEY) {
+      console.error('API_KEY is not configured');
+      return res.status(500).json({ error: 'Server configuration error: API key not available' });
+    }
+    
+    // Use public drive client
+    const drive = google.drive({
+      version: 'v3',
+      auth: API_KEY
+    });
+    
+    // First, get the file metadata to check if it's a PDF
+    console.log('Fetching file metadata for ID:', fileId);
+    const metadataResponse = await drive.files.get({
+      fileId: fileId,
+      fields: 'name, mimeType, webContentLink'
+    });
+    
+    const fileMetadata = metadataResponse.data;
+    console.log('File metadata:', fileMetadata);
+    
+    // Check if it's actually a PDF file
+    if (fileMetadata.mimeType !== 'application/pdf') {
+      console.log('File is not a PDF:', fileMetadata.mimeType);
+      return res.status(400).json({ error: 'File is not a PDF' });
+    }
+    
+    // Set appropriate headers for PDF
+    res.set('Content-Type', 'application/pdf');
+    res.set('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+    
+    // Use the Google Drive API to get the file content directly as a stream
+    console.log('Fetching PDF content directly from Google Drive API');
+    const pdfResponse = await drive.files.get(
+      {
+        fileId: fileId,
+        alt: 'media'
+      },
+      {
+        responseType: 'stream'
+      }
+    );
+    
+    console.log('Streaming PDF content to client via direct API');
+    
+    // Handle stream events
+    pdfResponse.data.on('error', (err) => {
+      console.error('Error streaming PDF:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to stream PDF: ' + err.message });
+      }
+    });
+    
+    // Pipe the PDF stream to the response
+    pdfResponse.data.pipe(res);
+  } catch (error) {
+    console.error('Error proxying public PDF for file ID:', req.params.fileId, error);
+    
+    // Handle specific error cases
+    if (error.code === 404) {
+      return res.status(404).json({ error: 'PDF file not found' });
+    } else if (error.code === 403) {
+      return res.status(403).json({ error: 'Access denied to PDF file. File may not be publicly accessible.' });
+    }
+    
+    // Check if headers have already been sent
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to proxy PDF: ' + error.message });
+    }
+  }
+});
+
 // PDF proxy route (authentication required)
 app.get('/api/private/drive/pdf/:fileId', authenticateToken, async (req, res) => {
   try {
@@ -226,6 +350,12 @@ app.get('/api/private/drive/pdf/:fileId', authenticateToken, async (req, res) =>
     if (!token) {
       console.log('No token provided for PDF proxy');
       return res.status(401).json({ error: 'Access token required' });
+    }
+    
+    // Check if OAuth credentials are available
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+      console.error('OAuth credentials are not configured');
+      return res.status(500).json({ error: 'Server configuration error: OAuth credentials not available' });
     }
     
     // Create authenticated drive client
@@ -286,13 +416,15 @@ app.get('/api/private/drive/pdf/:fileId', authenticateToken, async (req, res) =>
     // Pipe the PDF stream to the response
     pdfResponse.data.pipe(res);
   } catch (error) {
-    console.error('Error proxying PDF:', error);
+    console.error('Error proxying PDF for file ID:', req.params.fileId, error);
     
     // Handle specific error cases
     if (error.code === 404) {
       return res.status(404).json({ error: 'PDF file not found' });
     } else if (error.code === 403) {
       return res.status(403).json({ error: 'Access denied to PDF file' });
+    } else if (error.code === 401) {
+      return res.status(401).json({ error: 'Invalid or expired access token' });
     }
     
     // Check if headers have already been sent
@@ -339,6 +471,59 @@ app.get('/', (req, res) => {
   });
 });
 
+// Add a test endpoint to verify OAuth2 credentials
+app.get('/api/diag/oauth', async (req, res) => {
+  try {
+    console.log('Testing OAuth2 credentials...');
+    console.log('GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET');
+    console.log('GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET');
+    console.log('REDIRECT_URI:', process.env.REDIRECT_URI);
+    
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+      return res.status(500).json({
+        error: 'OAuth2 credentials not configured',
+        details: {
+          GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET',
+          GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET',
+          REDIRECT_URI: process.env.REDIRECT_URI || 'NOT SET'
+        }
+      });
+    }
+    
+    const { google } = require('googleapis');
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.REDIRECT_URI
+    );
+    
+    // Just test that we can create the client
+    res.json({
+      status: 'OAuth2 credentials are properly configured',
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      redirectUri: process.env.REDIRECT_URI
+    });
+  } catch (error) {
+    console.error('Error testing OAuth2 credentials:', error);
+    res.status(500).json({
+      error: 'Failed to test OAuth2 credentials',
+      message: error.message
+    });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+});
+
+// Add a diagnostic endpoint to check environment variables
+app.get('/api/diag/env', (req, res) => {
+  res.json({
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET',
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET',
+    REDIRECT_URI: process.env.REDIRECT_URI,
+    GOOGLE_API_KEY: process.env.GOOGLE_API_KEY ? 'SET' : 'NOT SET',
+    NODE_ENV: process.env.NODE_ENV,
+    PORT: process.env.PORT
+  });
 });
