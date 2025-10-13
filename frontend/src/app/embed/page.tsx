@@ -79,21 +79,13 @@ function EmbedPageContent() {
 
   function openPdfPreview(file: DriveFile) {
     console.log('Opening PDF preview, auth state:', { isAuthenticated, token });
-    // For authenticated users, use the private PDF proxy
-    if (isAuthenticated && token) {
-      const pdfProxyUrl = `/api/private/drive/pdf/${file.id}`;
-      setPdfPreview({
-        url: pdfProxyUrl,
-        name: file.name
-      });
-    } else {
-      // For unauthenticated users, use the public PDF proxy
-      const pdfProxyUrl = `/api/public/drive/pdf/${file.id}`;
-      setPdfPreview({
-        url: pdfProxyUrl,
-        name: file.name
-      });
-    }
+    // Always use the public PDF proxy for embed pages, regardless of authentication state
+    // This ensures public files can be previewed without requiring login
+    const pdfProxyUrl = `/api/public/drive/pdf/${file.id}`;
+    setPdfPreview({
+      url: pdfProxyUrl,
+      name: file.name
+    });
   }
 
   function closePdfPreview() {
@@ -162,11 +154,6 @@ function EmbedPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
-      {/* Debug authentication state */}
-      <div className="p-2 bg-yellow-100 text-yellow-800 text-xs">
-        Debug: isAuthenticated={isAuthenticated ? 'true' : 'false'}, token={token ? 'present' : 'null'}
-      </div>
-      
       {/* PDF Viewer Modal */}
       {pdfPreview && (
         <PdfViewer 

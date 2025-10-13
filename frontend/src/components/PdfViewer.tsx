@@ -97,9 +97,6 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
         const backendUrl = getBackendUrl();
         const url = `${backendUrl}${fileUrl}`;
       
-        console.log('Fetching PDF with URL:', url);
-        console.log('Using auth state:', { token, isPrivate: fileUrl.startsWith('/api/private/drive/pdf/') });
-      
         const headers: Record<string, string> = {};
         // Add authorization header only for private routes
         if (fileUrl.startsWith('/api/private/drive/pdf/')) {
@@ -110,8 +107,6 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
         }
       
         const response = await fetch(url, { headers });
-      
-        console.log('PDF fetch response status:', response.status);
       
         if (!response.ok) {
           let errorMessage = `Failed to fetch PDF: ${response.status} ${response.statusText}`;
