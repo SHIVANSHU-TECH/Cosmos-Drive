@@ -153,8 +153,10 @@ export default function DriveFileBrowser({ initialFolderId }: { initialFolderId:
 
   function openPdfPreview(file: DriveFile) {
     console.log('Opening PDF preview for file:', file);
-    // Use the PDF proxy instead of direct link
-    const pdfProxyUrl = `/api/private/drive/pdf/${file.id}`;
+    // Use the appropriate PDF proxy based on authentication status
+    const pdfProxyUrl = token 
+      ? `/api/private/drive/pdf/${file.id}`
+      : `/api/public/drive/pdf/${file.id}`;
     console.log('PDF proxy URL:', pdfProxyUrl);
     
     // Set the PDF preview directly without checking first
