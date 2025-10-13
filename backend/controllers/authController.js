@@ -7,12 +7,39 @@ const driveService = require('../services/driveService');
  */
 function getAuthUrl(req, res) {
   try {
+    console.log('=== AUTH URL GENERATION STARTED ===');
+    console.log('Current working directory:', process.cwd());
+    console.log('Environment variables in auth controller:');
+    console.log('GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET');
+    console.log('GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET');
+    console.log('REDIRECT_URI:', process.env.REDIRECT_URI);
+    
+    // Also check the process.env object directly
+    console.log('All env keys:', Object.keys(process.env).filter(key => 
+      key.includes('GOOGLE') || key.includes('CLIENT') || key.includes('SECRET')
+    ));
+    
     const authUrl = driveService.generateAuthUrl();
+    console.log('Generated auth URL:', authUrl);
+    console.log('=== AUTH URL GENERATION COMPLETED ===');
     res.json({ authUrl });
   } catch (error) {
+    console.error('=== ERROR GENERATING AUTH URL ===');
     console.error('Error generating auth URL:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error message:', error.message);
+    console.error('=== END ERROR ===');
+    
+    // More detailed error response
     if (error.message === 'OAuth2 credentials not configured') {
-      res.status(500).json({ error: 'OAuth2 is not properly configured. Please check your environment variables.' });
+      res.status(500).json({ 
+        error: 'OAuth2 is not properly configured. Please check your environment variables.',
+        details: {
+          GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET',
+          GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET',
+          REDIRECT_URI: process.env.REDIRECT_URI || 'NOT SET'
+        }
+      });
     } else {
       res.status(500).json({ error: 'Failed to generate authentication URL: ' + error.message });
     }

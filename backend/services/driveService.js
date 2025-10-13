@@ -9,6 +9,12 @@ const OAUTH2_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const OAUTH2_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const REDIRECT_URI = process.env.REDIRECT_URI || 'http://localhost:3000/auth/callback';
 
+console.log('Drive service environment variables:');
+console.log('GOOGLE_API_KEY:', API_KEY ? 'SET' : 'NOT SET');
+console.log('OAUTH2_CLIENT_ID:', OAUTH2_CLIENT_ID ? 'SET' : 'NOT SET');
+console.log('OAUTH2_CLIENT_SECRET:', OAUTH2_CLIENT_SECRET ? 'SET' : 'NOT SET');
+console.log('REDIRECT_URI:', REDIRECT_URI);
+
 // Initialize the Drive API client for public access
 const publicDrive = google.drive({
   version: 'v3',
@@ -21,8 +27,18 @@ const publicDrive = google.drive({
  */
 function generateAuthUrl() {
   // Check if OAuth2 credentials are configured
+  console.log('Checking OAuth2 credentials in generateAuthUrl:');
+  console.log('OAUTH2_CLIENT_ID:', OAUTH2_CLIENT_ID ? 'SET' : 'NOT SET');
+  console.log('OAUTH2_CLIENT_SECRET:', OAUTH2_CLIENT_SECRET ? 'SET' : 'NOT SET');
+  console.log('REDIRECT_URI:', REDIRECT_URI);
+  
   if (!OAUTH2_CLIENT_ID || !OAUTH2_CLIENT_SECRET) {
-    throw new Error('OAuth2 credentials not configured');
+    const error = new Error('OAuth2 credentials not configured');
+    console.error('OAuth2 credentials not configured:', {
+      OAUTH2_CLIENT_ID: OAUTH2_CLIENT_ID ? 'SET' : 'NOT SET',
+      OAUTH2_CLIENT_SECRET: OAUTH2_CLIENT_SECRET ? 'SET' : 'NOT SET'
+    });
+    throw error;
   }
   
   const oauth2Client = new google.auth.OAuth2(
@@ -240,6 +256,30 @@ async function getFolderPath(accessToken, folderId) {
   }
 }
 
+/**
+ * Get public PDF content
+ * @param {string} fileId - The ID of the Google Drive PDF file
+ * @returns {Promise<Buffer>} - PDF content as buffer
+ */
+async function getPublicPdfContent(fileId) {
+  try {
+    const response = await publicDrive.files.get(
+      {
+        fileId: fileId,
+        alt: 'media'
+      },
+      {
+        responseType: 'stream'
+      }
+    );
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching public PDF content:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   getFilesFromFolderPublic,
   getFilesFromFolderPrivate,
@@ -247,5 +287,6 @@ module.exports = {
   getFileDetailsPrivate,
   getFolderPath,
   generateAuthUrl,
-  getOAuthTokens
+  getOAuthTokens,
+  getPublicPdfContent
 };
