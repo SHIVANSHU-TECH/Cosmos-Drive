@@ -33,6 +33,7 @@ function EmbedPageContent() {
   const [folderPath, setFolderPath] = useState<Array<{id: string, name: string}>>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  const [darkMode, setDarkMode] = useState(false);
   const searchParams = useSearchParams();
   const { token, isAuthenticated } = useAuth();
 
@@ -47,7 +48,28 @@ function EmbedPageContent() {
       setCurrentFolderId(folderId);
       setFolderPath([{id: folderId, name: 'Root'}]); // Initialize with root folder
     }
+    
+    // Check for dark mode preference in localStorage or system preference
+    const savedDarkMode = localStorage.getItem('darkMode');
+    if (savedDarkMode !== null) {
+      setDarkMode(savedDarkMode === 'true');
+    } else {
+      // Check system preference
+      const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setDarkMode(systemPrefersDark);
+    }
   }, [searchParams]);
+
+  // Apply dark mode class to body
+  useEffect(() => {
+    if (darkMode) {
+      document.body.classList.add('dark');
+    } else {
+      document.body.classList.remove('dark');
+    }
+    // Save preference to localStorage
+    localStorage.setItem('darkMode', darkMode.toString());
+  }, [darkMode]);
 
   // Fetch files when currentFolderId changes
   useEffect(() => {
@@ -115,6 +137,10 @@ function EmbedPageContent() {
     setSearchTerm(e.target.value);
   };
 
+  const toggleDarkMode = () => {
+    setDarkMode(!darkMode);
+  };
+
   const filteredFiles = useMemo(() => {
     if (!searchTerm) return files;
     
@@ -127,10 +153,10 @@ function EmbedPageContent() {
   // Show loading state
   if (loading && files.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading files...</p>
+          <p className={`mt-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Loading files...</p>
         </div>
       </div>
     );
@@ -139,16 +165,16 @@ function EmbedPageContent() {
   // Show error state
   if (error && files.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
+      <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} p-4`}>
+        <div className={`max-w-md w-full rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
           <div className="text-center">
-            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+            <div className={`mx-auto flex items-center justify-center h-12 w-12 rounded-full ${darkMode ? 'bg-red-900' : 'bg-red-100'}`}>
               <svg className="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h3 className="mt-4 text-lg font-medium text-gray-900">Error</h3>
-            <div className="mt-2 text-sm text-gray-500">
+            <h3 className={`mt-4 text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Error</h3>
+            <div className={`mt-2 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
               <p>{error}</p>
             </div>
             <div className="mt-4">
@@ -166,7 +192,7 @@ function EmbedPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} p-4`}>
       {/* PDF Viewer Modal */}
       {pdfPreview && (
         <PdfViewer 
@@ -177,10 +203,10 @@ function EmbedPageContent() {
       )}
       
       <div className="max-w-6xl mx-auto">
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div className={`rounded-lg shadow-md overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
           {/* Breadcrumb Navigation */}
           {folderPath.length > 1 && (
-            <div className="p-3 bg-gray-100 border-b border-gray-200">
+            <div className={`p-3 ${darkMode ? 'bg-gray-700 border-b border-gray-600' : 'bg-gray-100 border-b border-gray-200'}`}>
               <nav className="flex overflow-x-auto" aria-label="Breadcrumb">
                 <ol className="inline-flex items-center space-x-1 md:space-x-2">
                   {folderPath.map((folder, index) => (
@@ -194,8 +220,8 @@ function EmbedPageContent() {
                         onClick={() => navigateToParentFolder(index)}
                         className={`inline-flex items-center text-sm font-medium ${
                           index === folderPath.length - 1 
-                            ? 'text-gray-500 cursor-default' 
-                            : 'text-blue-600 hover:underline'
+                            ? darkMode ? 'text-gray-400 cursor-default' : 'text-gray-500 cursor-default'
+                            : darkMode ? 'text-blue-400 hover:underline' : 'text-blue-600 hover:underline'
                         }`}
                         disabled={index === folderPath.length - 1}
                       >
@@ -208,13 +234,32 @@ function EmbedPageContent() {
             </div>
           )}
           
-          <div className="p-4 border-b border-gray-200">
-            <h1 className="text-xl font-semibold text-gray-800">Drive File Browser</h1>
-            <p className="text-sm text-gray-600 mt-1">Files in this folder</p>
+          <div className={`p-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h1 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Drive File Browser</h1>
+                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mt-1`}>Files in this folder</p>
+              </div>
+              <button
+                onClick={toggleDarkMode}
+                className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400 hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} transition-colors`}
+                aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+              >
+                {darkMode ? (
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                    <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
           
           {/* Search and View Controls */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 bg-gray-50 p-4 rounded-lg">
+          <div className={`flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} p-4 rounded-lg`}>
             <div className="w-full md:w-auto">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -227,7 +272,11 @@ function EmbedPageContent() {
                   value={searchTerm}
                   onChange={handleSearchChange}
                   placeholder="Search files..."
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className={`block w-full pl-10 pr-3 py-2 border rounded-md leading-5 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 sm:text-sm ${
+                    darkMode 
+                      ? 'bg-gray-600 border-gray-500 text-white focus:ring-blue-500 focus:border-blue-500' 
+                      : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500'
+                  }`}
                 />
               </div>
             </div>
@@ -236,8 +285,12 @@ function EmbedPageContent() {
                 onClick={() => setViewMode('grid')}
                 className={`px-4 py-2 rounded-md font-medium flex items-center ${
                   viewMode === 'grid' 
-                    ? 'bg-blue-600 text-white shadow-md' 
-                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    ? darkMode 
+                      ? 'bg-blue-600 text-white shadow-md' 
+                      : 'bg-blue-600 text-white shadow-md'
+                    : darkMode 
+                      ? 'bg-gray-600 text-gray-200 border border-gray-500 hover:bg-gray-500' 
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                 }`}
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -249,8 +302,12 @@ function EmbedPageContent() {
                 onClick={() => setViewMode('table')}
                 className={`px-4 py-2 rounded-md font-medium flex items-center ${
                   viewMode === 'table' 
-                    ? 'bg-blue-600 text-white shadow-md' 
-                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    ? darkMode 
+                      ? 'bg-blue-600 text-white shadow-md' 
+                      : 'bg-blue-600 text-white shadow-md'
+                    : darkMode 
+                      ? 'bg-gray-600 text-gray-200 border border-gray-500 hover:bg-gray-500' 
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                 }`}
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -263,7 +320,7 @@ function EmbedPageContent() {
           
           {/* Loading indicator for navigation */}
           {loading && files.length > 0 && (
-            <div className="p-4 bg-blue-50 text-blue-700 text-center">
+            <div className={`p-4 ${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-50 text-blue-700'} text-center`}>
               <div className="flex items-center justify-center">
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-700 mr-2"></div>
                 <span>Loading folder contents...</span>
@@ -273,12 +330,16 @@ function EmbedPageContent() {
           
           {/* Error indicator for navigation */}
           {error && files.length > 0 && (
-            <div className="p-4 bg-red-50 text-red-700">
+            <div className={`p-4 ${darkMode ? 'bg-red-900 text-red-200' : 'bg-red-50 text-red-700'}`}>
               <div className="flex items-center justify-between">
                 <span>Error: {error}</span>
                 <button
                   onClick={fetchFiles}
-                  className="px-3 py-1 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition-colors"
+                  className={`px-3 py-1 rounded-md text-sm transition-colors ${
+                    darkMode 
+                      ? 'bg-red-700 text-white hover:bg-red-600' 
+                      : 'bg-red-600 text-white hover:bg-red-700'
+                  }`}
                 >
                   Retry
                 </button>
@@ -291,8 +352,8 @@ function EmbedPageContent() {
               <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
               </svg>
-              <h3 className="mt-2 text-lg font-medium text-gray-900">No files found</h3>
-              <p className="mt-1 text-gray-500">
+              <h3 className={`mt-2 text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>No files found</h3>
+              <p className={`mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
                 {searchTerm ? 'No files match your search.' : 'This folder appears to be empty.'}
               </p>
             </div>
@@ -302,6 +363,7 @@ function EmbedPageContent() {
               navigateToFolder={navigateToFolder} 
               openPdfPreview={openPdfPreview} 
               allowDownload={allowDownload} 
+              darkMode={darkMode}
             />
           ) : (
             <TableView 
@@ -309,6 +371,7 @@ function EmbedPageContent() {
               navigateToFolder={navigateToFolder} 
               openPdfPreview={openPdfPreview} 
               allowDownload={allowDownload} 
+              darkMode={darkMode}
             />
           )}
         </div>
@@ -321,12 +384,14 @@ function GridView({
   files, 
   navigateToFolder, 
   openPdfPreview, 
-  allowDownload 
+  allowDownload,
+  darkMode
 }: { 
   files: DriveFile[]; 
   navigateToFolder: (folderId: string, folderName: string) => void;
   openPdfPreview: (file: DriveFile) => void;
   allowDownload: boolean;
+  darkMode: boolean;
 }) {
   const getFileIcon = (mimeType: string) => {
     if (mimeType.includes('folder')) {
@@ -359,10 +424,15 @@ function GridView({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
       {files.map((file) => (
-        <div key={file.id} className="border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow bg-white">
+        <div 
+          key={file.id} 
+          className={`border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow ${
+            darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'
+          }`}
+        >
           <div className="flex items-center mb-3">
             {getFileIcon(file.mimeType)}
-            <h3 className="font-medium text-gray-900 ml-2 truncate">{file.name}</h3>
+            <h3 className={`font-medium ml-2 truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>{file.name}</h3>
           </div>
           
           <div className="flex flex-wrap gap-2 mt-4">
@@ -404,13 +474,13 @@ function GridView({
           </div>
           
           {file.size && (
-            <p className="mt-2 text-xs text-gray-500">
+            <p className={`mt-2 text-xs ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
               Size: {formatFileSize(file.size)}
             </p>
           )}
           
           {file.modifiedTime && (
-            <p className="mt-1 text-xs text-gray-500">
+            <p className={`mt-1 text-xs ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
               Modified: {new Date(file.modifiedTime).toLocaleDateString()}
             </p>
           )}
@@ -424,12 +494,14 @@ function TableView({
   files, 
   navigateToFolder, 
   openPdfPreview, 
-  allowDownload 
+  allowDownload,
+  darkMode
 }: { 
   files: DriveFile[]; 
   navigateToFolder: (folderId: string, folderName: string) => void;
   openPdfPreview: (file: DriveFile) => void;
   allowDownload: boolean;
+  darkMode: boolean;
 }) {
   const getFileIcon = (mimeType: string) => {
     if (mimeType.includes('folder')) {
@@ -460,21 +532,21 @@ function TableView({
   };
   
   return (
-    <div className="overflow-x-auto rounded-lg shadow">
-      <table className="min-w-full bg-white">
-        <thead className="bg-gray-50">
+    <div className={`overflow-x-auto rounded-lg ${darkMode ? 'shadow-none' : 'shadow'}`}>
+      <table className={`min-w-full ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+        <thead className={darkMode ? 'bg-gray-700' : 'bg-gray-50'}>
           <tr>
-            <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-            <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-            <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-            <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Modified</th>
-            <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            <th className={`py-3 px-4 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Name</th>
+            <th className={`py-3 px-4 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Type</th>
+            <th className={`py-3 px-4 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Size</th>
+            <th className={`py-3 px-4 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Modified</th>
+            <th className={`py-3 px-4 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Actions</th>
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className={`divide-y ${darkMode ? 'divide-gray-700 bg-gray-800' : 'divide-gray-200 bg-white'}`}>
           {files.map((file) => (
-            <tr key={file.id} className="hover:bg-gray-50">
-              <td className="py-3 px-4">
+            <tr key={file.id} className={darkMode ? 'hover:bg-gray-750' : 'hover:bg-gray-50'}>
+              <td className={`py-3 px-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                 <div className="flex items-center">
                   <div className="flex-shrink-0 h-5 w-5 text-gray-500">
                     {getFileIcon(file.mimeType)}
@@ -483,7 +555,7 @@ function TableView({
                     {file.mimeType === 'application/vnd.google-apps.folder' ? (
                       <button 
                         onClick={() => navigateToFolder(file.id, file.name)}
-                        className="text-blue-600 hover:underline font-medium"
+                        className={`hover:underline font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}
                       >
                         {file.name}
                       </button>
@@ -494,14 +566,16 @@ function TableView({
                 </div>
               </td>
               <td className="py-3 px-4 whitespace-nowrap">
-                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 capitalize">
+                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                  darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'
+                } capitalize`}>
                   {file.mimeType.split('/')[1] || file.mimeType.split('/')[0]}
                 </span>
               </td>
-              <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-500">
+              <td className={`py-3 px-4 whitespace-nowrap text-sm ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
                 {file.size ? formatFileSize(file.size) : 'N/A'}
               </td>
-              <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-500">
+              <td className={`py-3 px-4 whitespace-nowrap text-sm ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
                 {file.modifiedTime ? new Date(file.modifiedTime).toLocaleDateString() : 'N/A'}
               </td>
               <td className="py-3 px-4 whitespace-nowrap text-sm font-medium">
@@ -553,11 +627,24 @@ function TableView({
 
 // Loading fallback component
 function EmbedPageLoading() {
+  const [darkMode, setDarkMode] = useState(false);
+  
+  useEffect(() => {
+    // Check for dark mode preference
+    const savedDarkMode = localStorage.getItem('darkMode');
+    if (savedDarkMode !== null) {
+      setDarkMode(savedDarkMode === 'true');
+    } else {
+      const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setDarkMode(systemPrefersDark);
+    }
+  }, []);
+  
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Loading files...</p>
+        <p className={`mt-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Loading files...</p>
       </div>
     </div>
   );
@@ -565,17 +652,30 @@ function EmbedPageLoading() {
 
 // Error fallback component
 function EmbedPageError({ error }: { error: string }) {
+  const [darkMode, setDarkMode] = useState(false);
+  
+  useEffect(() => {
+    // Check for dark mode preference
+    const savedDarkMode = localStorage.getItem('darkMode');
+    if (savedDarkMode !== null) {
+      setDarkMode(savedDarkMode === 'true');
+    } else {
+      const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setDarkMode(systemPrefersDark);
+    }
+  }, []);
+  
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
+    <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} p-4`}>
+      <div className={`max-w-md w-full rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
         <div className="text-center">
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+          <div className={`mx-auto flex items-center justify-center h-12 w-12 rounded-full ${darkMode ? 'bg-red-900' : 'bg-red-100'}`}>
             <svg className="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h3 className="mt-4 text-lg font-medium text-gray-900">Error</h3>
-          <div className="mt-2 text-sm text-gray-500">
+          <h3 className={`mt-4 text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Error</h3>
+          <div className={`mt-2 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
             <p>{error}</p>
           </div>
         </div>

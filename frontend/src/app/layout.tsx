@@ -20,7 +20,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={spaceGrotesk.className}>
-      <body>
+      <body className="bg-background-light dark:bg-background-dark text-foreground dark:text-white">
         <AuthProvider>
           {children}
         </AuthProvider>

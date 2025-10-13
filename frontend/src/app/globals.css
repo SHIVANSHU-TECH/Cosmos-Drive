@@ -24,4 +24,16 @@
     background: var(--background);
     color: var(--foreground);
   }
+  
+  /* Dark mode overrides */
+  .dark {
+    --background: #101c22;
+    --foreground: #ededed;
+  }
+  
+  /* Ensure dark mode works properly with Tailwind */
+  .dark body {
+    background: var(--background);
+    color: var(--foreground);
+  }
 }

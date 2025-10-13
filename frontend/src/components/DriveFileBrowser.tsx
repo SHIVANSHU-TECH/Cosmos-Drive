@@ -38,8 +38,22 @@ export default function DriveFileBrowser({ initialFolderId }: { initialFolderId:
   const [folderPath, setFolderPath] = useState<FolderPath[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [pdfPreview, setPdfPreview] = useState<{ url: string; name: string } | null>(null);
+  const [darkMode, setDarkMode] = useState(false);
   
   const { token, logout } = useAuth();
+
+  // Initialize dark mode
+  useEffect(() => {
+    // Check for dark mode preference in localStorage or system preference
+    const savedDarkMode = localStorage.getItem('darkMode');
+    if (savedDarkMode !== null) {
+      setDarkMode(savedDarkMode === 'true');
+    } else {
+      // Check system preference
+      const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setDarkMode(systemPrefersDark);
+    }
+  }, []);
 
   // Reset state when folder ID changes
   useEffect(() => {
@@ -173,10 +187,10 @@ export default function DriveFileBrowser({ initialFolderId }: { initialFolderId:
   // Show loading state
   if (loading && files.length === 0) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-[300px]">
+      <div className={`p-6 flex items-center justify-center min-h-[300px] ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600 text-xl font-medium">Loading files...</p>
+          <p className={`mt-4 text-xl font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Loading files...</p>
         </div>
       </div>
     );
@@ -185,17 +199,17 @@ export default function DriveFileBrowser({ initialFolderId }: { initialFolderId:
   // Show error state
   if (error && files.length === 0) {
     return (
-      <div className="p-6">
-        <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg shadow-md" role="alert">
+      <div className={`p-6 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+        <div className={`p-6 rounded-lg shadow-md ${darkMode ? 'bg-red-900 border-l-4 border-red-500' : 'bg-red-50 border-l-4 border-red-500'}`} role="alert">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <svg className="h-6 w-6 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className={`h-6 w-6 ${darkMode ? 'text-red-300' : 'text-red-500'}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <div className="ml-3">
-              <h3 className="text-lg font-medium text-red-800">Error</h3>
-              <div className="mt-2 text-sm text-red-700">
+              <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-red-800'}`}>Error</h3>
+              <div className={`mt-2 text-sm ${darkMode ? 'text-red-200' : 'text-red-700'}`}>
                 <p>{error}</p>
               </div>
               <div className="mt-4">
@@ -206,7 +220,11 @@ export default function DriveFileBrowser({ initialFolderId }: { initialFolderId:
                       fetchFilesAndPath();
                     }
                   }}
-                  className="px-4 py-2 bg-red-600 text-white font-medium rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                  className={`px-4 py-2 font-medium rounded-md transition-colors ${
+                    darkMode 
+                      ? 'bg-red-700 text-white hover:bg-red-600 focus:ring-red-500' 
+                      : 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
+                  }`}
                 >
                   Retry
                 </button>
@@ -224,7 +242,7 @@ export default function DriveFileBrowser({ initialFolderId }: { initialFolderId:
   const filesToDisplay = sortedFiles;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className={`p-6 max-w-7xl mx-auto ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       {/* PDF Viewer Modal */}
       {pdfPreview && (
         <PdfViewer 
@@ -236,8 +254,8 @@ export default function DriveFileBrowser({ initialFolderId }: { initialFolderId:
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Google Drive Files</h1>
-        <p className="text-gray-600">Browse and manage your Google Drive content</p>
+        <h1 className={`text-3xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Google Drive Files</h1>
+        <p className={darkMode ? 'text-gray-300' : 'text-gray-600'}>Browse and manage your Google Drive content</p>
       </div>
 
       {/* Breadcrumb Navigation */}
@@ -256,8 +274,8 @@ export default function DriveFileBrowser({ initialFolderId }: { initialFolderId:
                     onClick={() => handleBreadcrumbClick(folder.id)}
                     className={`inline-flex items-center text-sm font-medium ${
                       index === folderPath.length - 1 
-                        ? 'text-gray-500 cursor-default' 
-                        : 'text-blue-600 hover:underline'
+                        ? darkMode ? 'text-gray-400 cursor-default' : 'text-gray-500 cursor-default' 
+                        : darkMode ? 'text-blue-400 hover:underline' : 'text-blue-600 hover:underline'
                     }`}
                     disabled={index === folderPath.length - 1}
                   >
@@ -271,7 +289,7 @@ export default function DriveFileBrowser({ initialFolderId }: { initialFolderId:
       )}
 
       {/* Search and View Controls */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 bg-gray-50 p-4 rounded-lg">
+      <div className={`flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 p-4 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
         <div className="w-full md:w-auto">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -284,7 +302,11 @@ export default function DriveFileBrowser({ initialFolderId }: { initialFolderId:
               value={searchTerm}
               onChange={handleSearchChange}
               placeholder="Search files..."
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className={`block w-full pl-10 pr-3 py-2 border rounded-md leading-5 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 sm:text-sm ${
+                darkMode 
+                  ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' 
+                  : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500'
+              }`}
             />
           </div>
         </div>
@@ -293,8 +315,12 @@ export default function DriveFileBrowser({ initialFolderId }: { initialFolderId:
             onClick={() => setViewMode('grid')}
             className={`px-4 py-2 rounded-md font-medium flex items-center ${
               viewMode === 'grid' 
-                ? 'bg-blue-600 text-white shadow-md' 
-                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                ? darkMode 
+                  ? 'bg-blue-600 text-white shadow-md' 
+                  : 'bg-blue-600 text-white shadow-md'
+                : darkMode 
+                  ? 'bg-gray-700 text-gray-200 border border-gray-600 hover:bg-gray-600' 
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
             }`}
           >
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -306,8 +332,12 @@ export default function DriveFileBrowser({ initialFolderId }: { initialFolderId:
             onClick={() => setViewMode('table')}
             className={`px-4 py-2 rounded-md font-medium flex items-center ${
               viewMode === 'table' 
-                ? 'bg-blue-600 text-white shadow-md' 
-                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                ? darkMode 
+                  ? 'bg-blue-600 text-white shadow-md' 
+                  : 'bg-blue-600 text-white shadow-md'
+                : darkMode 
+                  ? 'bg-gray-700 text-gray-200 border border-gray-600 hover:bg-gray-600' 
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
             }`}
           >
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -320,9 +350,13 @@ export default function DriveFileBrowser({ initialFolderId }: { initialFolderId:
 
       {/* Error Message */}
       {showError && (
-        <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
+        <div className={`mb-6 p-4 rounded-lg border ${
+          darkMode 
+            ? 'bg-red-900 text-red-200 border-red-700' 
+            : 'bg-red-50 text-red-700 border-red-200'
+        }`}>
           <div className="flex items-center">
-            <svg className="w-5 h-5 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <svg className={`w-5 h-5 mr-2 ${darkMode ? 'text-red-300' : 'text-red-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
             <span className="font-medium">Error:</span>
@@ -332,7 +366,11 @@ export default function DriveFileBrowser({ initialFolderId }: { initialFolderId:
                 setError(null);
                 fetchFilesAndPath();
               }}
-              className="ml-auto px-3 py-1 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition-colors"
+              className={`ml-auto px-3 py-1 rounded-md text-sm transition-colors ${
+                darkMode 
+                  ? 'bg-red-700 text-white hover:bg-red-600' 
+                  : 'bg-red-600 text-white hover:bg-red-700'
+              }`}
             >
               Retry
             </button>
@@ -342,23 +380,23 @@ export default function DriveFileBrowser({ initialFolderId }: { initialFolderId:
 
       {/* Files Display */}
       {filesToDisplay.length === 0 ? (
-        <div className="text-center py-12">
+        <div className={`text-center py-12 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
           </svg>
-          <h3 className="mt-2 text-lg font-medium text-gray-900">No files found</h3>
-          <p className="mt-1 text-gray-500">Try adjusting your search or filter to find what you're looking for.</p>
+          <h3 className={`mt-2 text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>No files found</h3>
+          <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>Try adjusting your search or filter to find what you're looking for.</p>
         </div>
       ) : viewMode === 'grid' ? (
-        <GridView files={filesToDisplay} onFolderClick={handleFolderClick} openPdfPreview={openPdfPreview} />
+        <GridView files={filesToDisplay} onFolderClick={handleFolderClick} openPdfPreview={openPdfPreview} darkMode={darkMode} />
       ) : (
-        <TableView files={filesToDisplay} onFolderClick={handleFolderClick} onSort={handleSort} sortConfig={sortConfig} openPdfPreview={openPdfPreview} />
+        <TableView files={filesToDisplay} onFolderClick={handleFolderClick} onSort={handleSort} sortConfig={sortConfig} openPdfPreview={openPdfPreview} darkMode={darkMode} />
       )}
     </div>
   );
 }
 
-function GridView({ files, onFolderClick, openPdfPreview }: { files: DriveFile[]; onFolderClick: (folderId: string) => void; openPdfPreview: (file: DriveFile) => void; }) {
+function GridView({ files, onFolderClick, openPdfPreview, darkMode }: { files: DriveFile[]; onFolderClick: (folderId: string) => void; openPdfPreview: (file: DriveFile) => void; darkMode: boolean; }) {
   const { token } = useAuth();
   
   // Function to get thumbnail URL
@@ -423,21 +461,29 @@ function GridView({ files, onFolderClick, openPdfPreview }: { files: DriveFile[]
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
       {files.map((file) => (
-        <div key={file.id} className="border rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-200 bg-white">
+        <div key={file.id} className={`border rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-200 ${
+          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
           {file.mimeType === 'application/vnd.google-apps.folder' ? (
             // Folder view
             <button 
               onClick={() => onFolderClick(file.id)}
-              className="w-full h-32 flex flex-col items-center justify-center bg-blue-50 rounded-lg mb-4 hover:bg-blue-100 transition-colors group"
+              className={`w-full h-32 flex flex-col items-center justify-center rounded-lg mb-4 transition-colors group ${
+                darkMode ? 'bg-blue-900 hover:bg-blue-800' : 'bg-blue-50 hover:bg-blue-100'
+              }`}
             >
               <div className="group-hover:scale-110 transition-transform duration-200">
                 {getFileIcon(file.mimeType)}
               </div>
-              <span className="mt-3 text-blue-700 font-medium text-sm">Open Folder</span>
+              <span className={`mt-3 font-medium text-sm ${
+                darkMode ? 'text-blue-300' : 'text-blue-700'
+              }`}>Open Folder</span>
             </button>
           ) : (
             // File with thumbnail or icon
-            <div className="w-full h-32 rounded-lg mb-4 flex items-center justify-center bg-gray-50 relative">
+            <div className={`w-full h-32 rounded-lg mb-4 flex items-center justify-center relative ${
+              darkMode ? 'bg-gray-700' : 'bg-gray-50'
+            }`}>
               {file.thumbnailLink ? (
                 <>
                   <img 
@@ -468,17 +514,17 @@ function GridView({ files, onFolderClick, openPdfPreview }: { files: DriveFile[]
               )}
             </div>
           )}
-          <h3 className="font-semibold text-gray-900 truncate text-sm mb-1">{file.name}</h3>
-          <div className="flex flex-wrap items-center justify-between text-xs text-gray-500">
-            <span className="capitalize">
+          <h3 className={`font-semibold truncate text-sm mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>{file.name}</h3>
+          <div className="flex flex-wrap items-center justify-between text-xs">
+            <span className={`capitalize ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
               {file.mimeType.split('/')[1] || file.mimeType.split('/')[0]}
             </span>
             {file.size && (
-              <span>{formatFileSize(file.size)}</span>
+              <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>{formatFileSize(file.size)}</span>
             )}
           </div>
           {file.modifiedTime && (
-            <p className="text-xs text-gray-500 mt-1">
+            <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
               Modified: {new Date(file.modifiedTime).toLocaleDateString()}
             </p>
           )}
@@ -487,14 +533,22 @@ function GridView({ files, onFolderClick, openPdfPreview }: { files: DriveFile[]
               href={file.webViewLink} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="flex-1 min-w-[80px] text-center px-3 py-2 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className={`flex-1 min-w-[80px] text-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                darkMode 
+                  ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
             >
               View
             </a>
             {file.mimeType === 'application/pdf' && (
               <button
                 onClick={() => openPdfPreview(file)}
-                className="flex-1 min-w-[80px] text-center px-3 py-2 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                className={`flex-1 min-w-[80px] text-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                  darkMode 
+                    ? 'bg-green-600 text-white hover:bg-green-700' 
+                    : 'bg-green-600 text-white hover:bg-green-700'
+                }`}
               >
                 Preview
               </button>
@@ -506,12 +560,13 @@ function GridView({ files, onFolderClick, openPdfPreview }: { files: DriveFile[]
   );
 }
 
-function TableView({ files, onFolderClick, onSort, sortConfig, openPdfPreview }: { 
+function TableView({ files, onFolderClick, onSort, sortConfig, openPdfPreview, darkMode }: { 
   files: DriveFile[]; 
   onFolderClick: (folderId: string) => void;
   onSort: (key: keyof DriveFile) => void;
   sortConfig: { key: keyof DriveFile; direction: 'asc' | 'desc' } | null;
   openPdfPreview: (file: DriveFile) => void;
+  darkMode: boolean;
 }) {
   const { token } = useAuth();
   
@@ -580,13 +635,15 @@ function TableView({ files, onFolderClick, onSort, sortConfig, openPdfPreview }:
   };
 
   return (
-    <div className="overflow-x-auto rounded-lg shadow">
-      <table className="min-w-full bg-white">
-        <thead className="bg-gray-50">
+    <div className={`overflow-x-auto rounded-lg ${darkMode ? 'shadow-none' : 'shadow'}`}>
+      <table className={`min-w-full ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+        <thead className={darkMode ? 'bg-gray-700' : 'bg-gray-50'}>
           <tr>
-            <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preview</th>
+            <th className={`py-3 px-4 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Preview</th>
             <th 
-              className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              className={`py-3 px-4 text-left text-xs font-medium uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${
+                darkMode ? 'hover:bg-gray-600 text-gray-300' : 'hover:bg-gray-100 text-gray-500'
+              }`}
               onClick={() => onSort('name')}
             >
               <div className="flex items-center">
@@ -594,7 +651,9 @@ function TableView({ files, onFolderClick, onSort, sortConfig, openPdfPreview }:
               </div>
             </th>
             <th 
-              className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              className={`py-3 px-4 text-left text-xs font-medium uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${
+                darkMode ? 'hover:bg-gray-600 text-gray-300' : 'hover:bg-gray-100 text-gray-500'
+              }`}
               onClick={() => onSort('mimeType')}
             >
               <div className="flex items-center">
@@ -602,7 +661,9 @@ function TableView({ files, onFolderClick, onSort, sortConfig, openPdfPreview }:
               </div>
             </th>
             <th 
-              className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              className={`py-3 px-4 text-left text-xs font-medium uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${
+                darkMode ? 'hover:bg-gray-600 text-gray-300' : 'hover:bg-gray-100 text-gray-500'
+              }`}
               onClick={() => onSort('size')}
             >
               <div className="flex items-center">
@@ -610,20 +671,22 @@ function TableView({ files, onFolderClick, onSort, sortConfig, openPdfPreview }:
               </div>
             </th>
             <th 
-              className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              className={`py-3 px-4 text-left text-xs font-medium uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${
+                darkMode ? 'hover:bg-gray-600 text-gray-300' : 'hover:bg-gray-100 text-gray-500'
+              }`}
               onClick={() => onSort('modifiedTime')}
             >
               <div className="flex items-center">
                 Modified {getSortIndicator('modifiedTime')}
               </div>
             </th>
-            <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            <th className={`py-3 px-4 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Actions</th>
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className={`divide-y ${darkMode ? 'divide-gray-700 bg-gray-800' : 'divide-gray-200 bg-white'}`}>
           {files.map((file) => (
-            <tr key={file.id} className="hover:bg-gray-50">
-              <td className="py-3 px-4 whitespace-nowrap">
+            <tr key={file.id} className={darkMode ? 'hover:bg-gray-750' : 'hover:bg-gray-50'}>
+              <td className={`py-3 px-4 whitespace-nowrap ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                 {file.mimeType === 'application/vnd.google-apps.folder' ? (
                   <div className="flex items-center">
                     {getFileIcon(file.mimeType)}
@@ -657,12 +720,14 @@ function TableView({ files, onFolderClick, onSort, sortConfig, openPdfPreview }:
                   </div>
                 )}
               </td>
-              <td className="py-3 px-4">
+              <td className={`py-3 px-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                 <div className="flex items-center">
                   {file.mimeType === 'application/vnd.google-apps.folder' ? (
                     <button 
                       onClick={() => onFolderClick(file.id)}
-                      className="flex items-center text-blue-600 hover:underline font-medium"
+                      className={`flex items-center hover:underline font-medium ${
+                        darkMode ? 'text-blue-400' : 'text-blue-600'
+                      }`}
                     >
                       <span className="truncate max-w-[150px]">{file.name}</span>
                     </button>
@@ -672,14 +737,16 @@ function TableView({ files, onFolderClick, onSort, sortConfig, openPdfPreview }:
                 </div>
               </td>
               <td className="py-3 px-4 whitespace-nowrap">
-                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 capitalize">
+                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                  darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'
+                } capitalize`}>
                   {file.mimeType.split('/')[1] || file.mimeType.split('/')[0]}
                 </span>
               </td>
-              <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-500">
+              <td className={`py-3 px-4 whitespace-nowrap text-sm ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
                 {file.size ? formatFileSize(file.size) : 'N/A'}
               </td>
-              <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-500">
+              <td className={`py-3 px-4 whitespace-nowrap text-sm ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
                 {file.modifiedTime ? new Date(file.modifiedTime).toLocaleDateString() : 'N/A'}
               </td>
               <td className="py-3 px-4 whitespace-nowrap text-sm font-medium">
@@ -688,14 +755,22 @@ function TableView({ files, onFolderClick, onSort, sortConfig, openPdfPreview }:
                     href={file.webViewLink} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition-colors"
+                    className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                      darkMode 
+                        ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
                   >
                     View
                   </a>
                   {file.mimeType === 'application/pdf' && (
                     <button
                       onClick={() => openPdfPreview(file)}
-                      className="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition-colors"
+                      className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                        darkMode 
+                          ? 'bg-green-600 text-white hover:bg-green-700' 
+                          : 'bg-green-600 text-white hover:bg-green-700'
+                      }`}
                     >
                       Preview
                     </button>
