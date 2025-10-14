@@ -329,6 +329,10 @@ app.get('/api/public/drive/pdf/:fileId', async (req, res) => {
       return res.status(404).json({ error: 'PDF file not found' });
     } else if (error.code === 403) {
       return res.status(403).json({ error: 'Access denied to PDF file. File may not be publicly accessible.' });
+    } else if (error.code === 401) {
+      return res.status(401).json({ error: 'Invalid API key' });
+    } else if (error.code === 400) {
+      return res.status(400).json({ error: 'Invalid file type. Only PDF files can be previewed.' });
     }
     
     // Check if headers have already been sent
