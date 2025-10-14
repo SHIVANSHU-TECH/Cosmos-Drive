@@ -529,29 +529,56 @@ function GridView({ files, onFolderClick, openPdfPreview, darkMode }: { files: D
             </p>
           )}
           <div className="mt-4 flex flex-wrap gap-2">
-            <a 
-              href={file.webViewLink} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className={`flex-1 min-w-[80px] text-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
-                darkMode 
-                  ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
-            >
-              View
-            </a>
-            {file.mimeType === 'application/pdf' && (
-              <button
-                onClick={() => openPdfPreview(file)}
-                className={`flex-1 min-w-[80px] text-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
-                  darkMode 
-                    ? 'bg-green-600 text-white hover:bg-green-700' 
-                    : 'bg-green-600 text-white hover:bg-green-700'
-                }`}
-              >
-                Preview
-              </button>
+            {file.mimeType === 'application/vnd.google-apps.folder' ? (
+              <>
+                <button
+                  onClick={() => onFolderClick(file.id)}
+                  className={`flex-1 min-w-[80px] text-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    darkMode 
+                      ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  Open
+                </button>
+                <button
+                  onClick={() => onFolderClick(file.id)}
+                  className={`flex-1 min-w-[80px] text-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    darkMode 
+                      ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  View
+                </button>
+              </>
+            ) : (
+              <>
+                <a 
+                  href={file.webViewLink} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className={`flex-1 min-w-[80px] text-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    darkMode 
+                      ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  View
+                </a>
+                {file.mimeType === 'application/pdf' && (
+                  <button
+                    onClick={() => openPdfPreview(file)}
+                    className={`flex-1 min-w-[80px] text-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      darkMode 
+                        ? 'bg-green-600 text-white hover:bg-green-700' 
+                        : 'bg-green-600 text-white hover:bg-green-700'
+                    }`}
+                  >
+                    Preview
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -752,16 +779,28 @@ function TableView({ files, onFolderClick, onSort, sortConfig, openPdfPreview, d
               <td className="py-3 px-4 whitespace-nowrap text-sm font-medium">
                 <div className="flex flex-wrap gap-2">
                   {file.mimeType === 'application/vnd.google-apps.folder' ? (
-                    <button
-                      onClick={() => onFolderClick(file.id)}
-                      className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                        darkMode 
-                          ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                          : 'bg-blue-600 text-white hover:bg-blue-700'
-                      }`}
-                    >
-                      Open
-                    </button>
+                    <>
+                      <button
+                        onClick={() => onFolderClick(file.id)}
+                        className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                          darkMode 
+                            ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                        }`}
+                      >
+                        Open
+                      </button>
+                      <button
+                        onClick={() => onFolderClick(file.id)}
+                        className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                          darkMode 
+                            ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                        }`}
+                      >
+                        View
+                      </button>
+                    </>
                   ) : (
                     <>
                       <a 
