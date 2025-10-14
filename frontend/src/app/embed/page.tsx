@@ -450,7 +450,7 @@ function GridView({
                 rel="noopener noreferrer"
                 className="flex-1 min-w-[80px] text-center px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
               >
-                View
+                Download
               </a>
             )}
             
@@ -459,7 +459,7 @@ function GridView({
                 onClick={() => openPdfPreview(file)}
                 className="flex-1 min-w-[80px] text-center px-3 py-1.5 text-sm font-medium bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
               >
-                Preview
+                View
               </button>
             ) : file.mimeType !== 'application/vnd.google-apps.folder' && allowDownload && file.webContentLink ? (
               <a
@@ -594,7 +594,7 @@ function TableView({
                       rel="noopener noreferrer"
                       className="px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition-colors"
                     >
-                      View
+                      Download
                     </a>
                   )}
                   
@@ -603,7 +603,7 @@ function TableView({
                       onClick={() => openPdfPreview(file)}
                       className="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition-colors"
                     >
-                      Preview
+                      View
                     </button>
                   ) : file.mimeType !== 'application/vnd.google-apps.folder' && allowDownload && file.webContentLink ? (
                     <a

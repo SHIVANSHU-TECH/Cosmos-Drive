@@ -564,7 +564,7 @@ function GridView({ files, onFolderClick, openPdfPreview, darkMode }: { files: D
                       : 'bg-blue-600 text-white hover:bg-blue-700'
                   }`}
                 >
-                  View
+                  Download
                 </a>
                 {file.mimeType === 'application/pdf' && (
                   <button
@@ -575,8 +575,22 @@ function GridView({ files, onFolderClick, openPdfPreview, darkMode }: { files: D
                         : 'bg-green-600 text-white hover:bg-green-700'
                     }`}
                   >
-                    Preview
+                    View
                   </button>
+                )}
+                {file.mimeType !== 'application/vnd.google-apps.folder' && file.webContentLink && (
+                  <a
+                    href={file.webContentLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`flex-1 min-w-[80px] text-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      darkMode 
+                        ? 'bg-green-600 text-white hover:bg-green-700' 
+                        : 'bg-green-600 text-white hover:bg-green-700'
+                    }`}
+                  >
+                    Download
+                  </a>
                 )}
               </>
             )}
@@ -813,7 +827,7 @@ function TableView({ files, onFolderClick, onSort, sortConfig, openPdfPreview, d
                             : 'bg-blue-600 text-white hover:bg-blue-700'
                         }`}
                       >
-                        View
+                        Download
                       </a>
                       {file.mimeType === 'application/pdf' && (
                         <button
@@ -824,8 +838,22 @@ function TableView({ files, onFolderClick, onSort, sortConfig, openPdfPreview, d
                               : 'bg-green-600 text-white hover:bg-green-700'
                           }`}
                         >
-                          Preview
+                          View
                         </button>
+                      )}
+                      {file.mimeType !== 'application/vnd.google-apps.folder' && file.webContentLink && (
+                        <a
+                          href={file.webContentLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                            darkMode 
+                              ? 'bg-green-600 text-white hover:bg-green-700' 
+                              : 'bg-green-600 text-white hover:bg-green-700'
+                          }`}
+                        >
+                          Download
+                        </a>
                       )}
                     </>
                   )}
