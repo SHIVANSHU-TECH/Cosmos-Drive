@@ -751,29 +751,44 @@ function TableView({ files, onFolderClick, onSort, sortConfig, openPdfPreview, d
               </td>
               <td className="py-3 px-4 whitespace-nowrap text-sm font-medium">
                 <div className="flex flex-wrap gap-2">
-                  <a 
-                    href={file.webViewLink} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                      darkMode 
-                        ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                    }`}
-                  >
-                    View
-                  </a>
-                  {file.mimeType === 'application/pdf' && (
+                  {file.mimeType === 'application/vnd.google-apps.folder' ? (
                     <button
-                      onClick={() => openPdfPreview(file)}
+                      onClick={() => onFolderClick(file.id)}
                       className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
                         darkMode 
-                          ? 'bg-green-600 text-white hover:bg-green-700' 
-                          : 'bg-green-600 text-white hover:bg-green-700'
+                          ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
                       }`}
                     >
-                      Preview
+                      Open
                     </button>
+                  ) : (
+                    <>
+                      <a 
+                        href={file.webViewLink} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                          darkMode 
+                            ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                        }`}
+                      >
+                        View
+                      </a>
+                      {file.mimeType === 'application/pdf' && (
+                        <button
+                          onClick={() => openPdfPreview(file)}
+                          className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                            darkMode 
+                              ? 'bg-green-600 text-white hover:bg-green-700' 
+                              : 'bg-green-600 text-white hover:bg-green-700'
+                          }`}
+                        >
+                          Preview
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </td>
