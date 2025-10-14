@@ -558,6 +558,7 @@ function GridView({ files, onFolderClick, openPdfPreview, darkMode }: { files: D
                   href={file.webViewLink} 
                   target="_blank" 
                   rel="noopener noreferrer"
+                  download={file.name}
                   className={`flex-1 min-w-[80px] text-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
                     darkMode 
                       ? 'bg-blue-600 text-white hover:bg-blue-700' 
@@ -583,6 +584,7 @@ function GridView({ files, onFolderClick, openPdfPreview, darkMode }: { files: D
                     href={file.webContentLink}
                     target="_blank"
                     rel="noopener noreferrer"
+                    download={file.name}
                     className={`flex-1 min-w-[80px] text-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
                       darkMode 
                         ? 'bg-green-600 text-white hover:bg-green-700' 
@@ -821,6 +823,7 @@ function TableView({ files, onFolderClick, onSort, sortConfig, openPdfPreview, d
                         href={file.webViewLink} 
                         target="_blank" 
                         rel="noopener noreferrer"
+                        download={file.name}
                         className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
                           darkMode 
                             ? 'bg-blue-600 text-white hover:bg-blue-700' 
@@ -846,6 +849,7 @@ function TableView({ files, onFolderClick, onSort, sortConfig, openPdfPreview, d
                           href={file.webContentLink}
                           target="_blank"
                           rel="noopener noreferrer"
+                          download={file.name}
                           className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
                             darkMode 
                               ? 'bg-green-600 text-white hover:bg-green-700' 
