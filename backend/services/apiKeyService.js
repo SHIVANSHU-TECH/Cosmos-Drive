@@ -1,6 +1,16 @@
 const User = require('../models/User');
 const crypto = require('crypto');
-const { db, admin } = require('../config/firebase'); // Import Firebase
+
+// Try to import Firebase, but handle the case where it's not available
+let firebaseModule;
+try {
+  firebaseModule = require('../config/firebase');
+} catch (error) {
+  console.warn('Firebase module not available, using in-memory storage');
+  firebaseModule = { db: null, admin: null };
+}
+
+const { db, admin } = firebaseModule;
 
 // Fallback to in-memory storage if Firebase is not configured
 let users = new Map();

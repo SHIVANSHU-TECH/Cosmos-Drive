@@ -1,4 +1,13 @@
-const { db } = require('../config/firebase');
+// Try to import Firebase, but handle the case where it's not available
+let firebaseModule;
+try {
+  firebaseModule = require('../config/firebase');
+} catch (error) {
+  console.warn('Firebase module not available');
+  firebaseModule = { db: null };
+}
+
+const { db } = firebaseModule;
 
 class FirebaseService {
   /**

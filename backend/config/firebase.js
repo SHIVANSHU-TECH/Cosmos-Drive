@@ -1,6 +1,9 @@
-const admin = require('firebase-admin');
+let admin, db;
 
 try {
+  // Try to import firebase-admin
+  admin = require('firebase-admin');
+  
   // Firebase configuration
   const serviceAccount = {
     type: process.env.FIREBASE_TYPE,
@@ -18,7 +21,8 @@ try {
   // Check if required service account properties are present
   if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
     console.warn('Firebase service account credentials not fully configured. Firebase features will be disabled.');
-    module.exports = { admin: null, db: null };
+    admin = null;
+    db = null;
   } else {
     // Initialize Firebase Admin SDK
     if (!admin.apps.length) {
@@ -28,11 +32,13 @@ try {
       });
     }
 
-    const db = admin.database(); // Use Realtime Database instead of Firestore
-    module.exports = { admin, db };
+    db = admin.database(); // Use Realtime Database instead of Firestore
   }
 } catch (error) {
   console.warn('Firebase initialization failed:', error.message);
   console.warn('Firebase features will be disabled.');
-  module.exports = { admin: null, db: null };
+  admin = null;
+  db = null;
 }
+
+module.exports = { admin, db };
