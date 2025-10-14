@@ -445,11 +445,11 @@ function GridView({
               </button>
             ) : (
               <a 
-                href={file.webViewLink} 
+                href={file.webContentLink || file.webViewLink} 
                 target="_blank" 
                 rel="noopener noreferrer"
                 download={file.name}
-                className="flex-1 min-w-[80px] text-center px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                className="flex-1 min-w-[80px] text-center px-3 py-1.5 text-sm font-medium bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
               >
                 Download
               </a>
@@ -458,21 +458,11 @@ function GridView({
             {file.mimeType === 'application/pdf' ? (
               <button
                 onClick={() => openPdfPreview(file)}
-                className="flex-1 min-w-[80px] text-center px-3 py-1.5 text-sm font-medium bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                className="flex-1 min-w-[80px] text-center px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
               >
                 View
               </button>
-            ) : file.mimeType !== 'application/vnd.google-apps.folder' && allowDownload && file.webContentLink ? (
-                    <a
-                      href={file.webContentLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      download={file.name}
-                      className="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition-colors"
-                    >
-                      Download
-                    </a>
-                  ) : null}
+            ) : null}
           </div>
           
           {file.size && (
@@ -591,11 +581,11 @@ function TableView({
                     </button>
                   ) : (
                     <a 
-                      href={file.webViewLink} 
+                      href={file.webContentLink || file.webViewLink} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       download={file.name}
-                      className="px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition-colors"
+                      className="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition-colors"
                     >
                       Download
                     </a>
@@ -604,19 +594,10 @@ function TableView({
                   {file.mimeType === 'application/pdf' ? (
                     <button
                       onClick={() => openPdfPreview(file)}
-                      className="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition-colors"
+                      className="px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition-colors"
                     >
                       View
                     </button>
-                  ) : file.mimeType !== 'application/vnd.google-apps.folder' && allowDownload && file.webContentLink ? (
-                    <a
-                      href={file.webContentLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition-colors"
-                    >
-                      Download
-                    </a>
                   ) : null}
                 </div>
               </td>

@@ -555,14 +555,14 @@ function GridView({ files, onFolderClick, openPdfPreview, darkMode }: { files: D
             ) : (
               <>
                 <a 
-                  href={file.webViewLink} 
+                  href={file.webContentLink || file.webViewLink} 
                   target="_blank" 
                   rel="noopener noreferrer"
                   download={file.name}
                   className={`flex-1 min-w-[80px] text-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
                     darkMode 
-                      ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                      ? 'bg-green-600 text-white hover:bg-green-700' 
+                      : 'bg-green-600 text-white hover:bg-green-700'
                   }`}
                 >
                   Download
@@ -572,27 +572,12 @@ function GridView({ files, onFolderClick, openPdfPreview, darkMode }: { files: D
                     onClick={() => openPdfPreview(file)}
                     className={`flex-1 min-w-[80px] text-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
                       darkMode 
-                        ? 'bg-green-600 text-white hover:bg-green-700' 
-                        : 'bg-green-600 text-white hover:bg-green-700'
+                        ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
                     }`}
                   >
                     View
                   </button>
-                )}
-                {file.mimeType !== 'application/vnd.google-apps.folder' && file.webContentLink && (
-                  <a
-                    href={file.webContentLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    download={file.name}
-                    className={`flex-1 min-w-[80px] text-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
-                      darkMode 
-                        ? 'bg-green-600 text-white hover:bg-green-700' 
-                        : 'bg-green-600 text-white hover:bg-green-700'
-                    }`}
-                  >
-                    Download
-                  </a>
                 )}
               </>
             )}
@@ -820,14 +805,14 @@ function TableView({ files, onFolderClick, onSort, sortConfig, openPdfPreview, d
                   ) : (
                     <>
                       <a 
-                        href={file.webViewLink} 
+                        href={file.webContentLink || file.webViewLink} 
                         target="_blank" 
                         rel="noopener noreferrer"
                         download={file.name}
                         className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
                           darkMode 
-                            ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                            ? 'bg-green-600 text-white hover:bg-green-700' 
+                            : 'bg-green-600 text-white hover:bg-green-700'
                         }`}
                       >
                         Download
@@ -837,27 +822,12 @@ function TableView({ files, onFolderClick, onSort, sortConfig, openPdfPreview, d
                           onClick={() => openPdfPreview(file)}
                           className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
                             darkMode 
-                              ? 'bg-green-600 text-white hover:bg-green-700' 
-                              : 'bg-green-600 text-white hover:bg-green-700'
+                              ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                              : 'bg-blue-600 text-white hover:bg-blue-700'
                           }`}
                         >
                           View
                         </button>
-                      )}
-                      {file.mimeType !== 'application/vnd.google-apps.folder' && file.webContentLink && (
-                        <a
-                          href={file.webContentLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          download={file.name}
-                          className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                            darkMode 
-                              ? 'bg-green-600 text-white hover:bg-green-700' 
-                              : 'bg-green-600 text-white hover:bg-green-700'
-                          }`}
-                        >
-                          Download
-                        </a>
                       )}
                     </>
                   )}
