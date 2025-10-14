@@ -15,7 +15,7 @@ async function createApiKey(req, res) {
     }
     
     // Create a new user with API key
-    const user = ApiKeyService.createUser(email);
+    const user = await ApiKeyService.createUser(email);
     
     res.status(201).json({
       apiKey: user.apiKey,
@@ -51,7 +51,7 @@ async function addGoogleTokens(req, res) {
     }
     
     // Add tokens to user
-    const user = ApiKeyService.addGoogleTokensToUser(apiKey, accessToken, refreshToken);
+    const user = await ApiKeyService.addGoogleTokensToUser(apiKey, accessToken, refreshToken);
     
     if (!user) {
       return res.status(404).json({ 
@@ -93,7 +93,7 @@ async function getFolderFiles(req, res) {
     }
     
     // Validate API key
-    const user = ApiKeyService.getUserByApiKey(apiKey);
+    const user = await ApiKeyService.getUserByApiKey(apiKey);
     if (!user) {
       return res.status(403).json({ 
         error: 'Invalid API key. Please check your API key and try again.' 
@@ -168,7 +168,7 @@ async function getFolderForEmbed(req, res) {
     }
     
     // Validate API key
-    const user = ApiKeyService.getUserByApiKey(apiKey);
+    const user = await ApiKeyService.getUserByApiKey(apiKey);
     if (!user) {
       return res.status(403).json({ 
         error: 'Invalid API key. Please check your API key and try again.' 
@@ -242,7 +242,7 @@ async function getFileForEmbed(req, res) {
     }
     
     // Validate API key
-    const user = ApiKeyService.getUserByApiKey(apiKey);
+    const user = await ApiKeyService.getUserByApiKey(apiKey);
     if (!user) {
       return res.status(403).json({ 
         error: 'Invalid API key. Please check your API key and try again.' 

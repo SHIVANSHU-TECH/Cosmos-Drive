@@ -24,6 +24,19 @@ class User {
   hasGoogleTokens() {
     return this.googleAccessToken && this.googleRefreshToken;
   }
+  
+  // toJSON method for proper serialization
+  toJSON() {
+    return {
+      id: this.id,
+      email: this.email,
+      apiKey: this.apiKey,
+      googleAccessToken: this.googleAccessToken,
+      googleRefreshToken: this.googleRefreshToken,
+      createdAt: this.createdAt,
+      lastAccessed: this.lastAccessed
+    };
+  }
 }
 
 module.exports = User;

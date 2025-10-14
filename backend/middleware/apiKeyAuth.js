@@ -1,6 +1,6 @@
 const ApiKeyService = require('../services/apiKeyService');
 
-function authenticateApiKey(req, res, next) {
+async function authenticateApiKey(req, res, next) {
   const apiKey = req.headers['x-api-key'] || req.query.apiKey;
   
   if (!apiKey) {
@@ -9,17 +9,24 @@ function authenticateApiKey(req, res, next) {
     });
   }
   
-  const user = ApiKeyService.getUserByApiKey(apiKey);
-  
-  if (!user) {
-    return res.status(403).json({ 
-      error: 'Invalid API key. Please check your API key and try again.' 
+  try {
+    const user = await ApiKeyService.getUserByApiKey(apiKey);
+    
+    if (!user) {
+      return res.status(403).json({ 
+        error: 'Invalid API key. Please check your API key and try again.' 
+      });
+    }
+    
+    // Add user to request object
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error('Error authenticating API key:', error);
+    return res.status(500).json({ 
+      error: 'Authentication error: ' + error.message 
     });
   }
-  
-  // Add user to request object
-  req.user = user;
-  next();
 }
 
 module.exports = {
