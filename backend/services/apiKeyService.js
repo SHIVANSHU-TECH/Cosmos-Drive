@@ -65,8 +65,8 @@ class ApiKeyService {
     // If Firebase is configured, get from Realtime Database
     if (db) {
       try {
-        // Add timeout to Firebase operation (5 seconds)
-        const snapshot = await withTimeout(db.ref('users/' + apiKey).once('value'), 5000);
+        // Add timeout to Firebase operation (8 seconds)
+        const snapshot = await withTimeout(db.ref('users/' + apiKey).once('value'), 8000);
         if (!snapshot.exists()) {
           return null;
         }
@@ -82,7 +82,7 @@ class ApiKeyService {
         user.createdAt = new Date(userData.createdAt);
         user.lastAccessed = new Date(userData.lastAccessed);
         
-        // Update last accessed time
+        // Update last accessed time with timeout (5 seconds)
         user.updateLastAccessed();
         await withTimeout(db.ref('users/' + apiKey).update({
           lastAccessed: user.lastAccessed.toISOString()
@@ -113,8 +113,8 @@ class ApiKeyService {
     // If Firebase is configured, update in Realtime Database
     if (db) {
       try {
-        // Add timeout to Firebase operation (5 seconds)
-        const snapshot = await withTimeout(db.ref('users/' + apiKey).once('value'), 5000);
+        // Add timeout to Firebase operation (8 seconds)
+        const snapshot = await withTimeout(db.ref('users/' + apiKey).once('value'), 8000);
         if (!snapshot.exists()) {
           return null;
         }
@@ -130,7 +130,7 @@ class ApiKeyService {
         user.createdAt = new Date(userData.createdAt);
         user.lastAccessed = new Date(userData.lastAccessed);
         
-        // Update tokens in Realtime Database
+        // Update tokens in Realtime Database with timeout (5 seconds)
         await withTimeout(db.ref('users/' + apiKey).update({
           googleAccessToken: accessToken,
           googleRefreshToken: refreshToken,
@@ -164,8 +164,8 @@ class ApiKeyService {
     // If Firebase is configured, get all from Realtime Database
     if (db) {
       try {
-        // Add timeout to Firebase operation (5 seconds)
-        const snapshot = await withTimeout(db.ref('users').once('value'), 5000);
+        // Add timeout to Firebase operation (8 seconds)
+        const snapshot = await withTimeout(db.ref('users').once('value'), 8000);
         const users = [];
         
         if (snapshot.exists()) {

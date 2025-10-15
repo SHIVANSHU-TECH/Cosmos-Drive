@@ -202,9 +202,9 @@ async function getFolderForEmbed(req, res) {
       });
     }
     
-    // Set a timeout for the operation (15 seconds)
+    // Set a timeout for the operation (12 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Operation timed out')), 15000);
+      setTimeout(() => reject(new Error('Operation timed out')), 12000);
     });
     
     // Validate API key
@@ -223,21 +223,29 @@ async function getFolderForEmbed(req, res) {
       return res.status(400).json({ error: 'Folder ID is required' });
     }
     
+    // Set a timeout for the file fetching operation (15 seconds)
+    const fileFetchTimeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('File fetching timed out')), 15000);
+    });
+    
     let files;
     // If user has Google tokens, use private access, otherwise fall back to public
     if (user.hasGoogleTokens()) {
       console.log('Using private access with user tokens');
       try {
-        files = await driveService.getFilesFromFolderPrivate(user.googleAccessToken, folderId);
+        const privateFilesPromise = driveService.getFilesFromFolderPrivate(user.googleAccessToken, folderId);
+        files = await Promise.race([privateFilesPromise, fileFetchTimeoutPromise]);
       } catch (error) {
         console.error('Error fetching files with private access:', error);
         // If private access fails, fall back to public access
         console.log('Falling back to public access');
-        files = await driveService.getFilesFromFolderPublic(folderId);
+        const publicFilesPromise = driveService.getFilesFromFolderPublic(folderId);
+        files = await Promise.race([publicFilesPromise, fileFetchTimeoutPromise]);
       }
     } else {
       console.log('Using public access (user has no Google tokens)');
-      files = await driveService.getFilesFromFolderPublic(folderId);
+      const publicFilesPromise = driveService.getFilesFromFolderPublic(folderId);
+      files = await Promise.race([publicFilesPromise, fileFetchTimeoutPromise]);
     }
     
     console.log('Files found:', files ? files.length : 0);
@@ -253,7 +261,7 @@ async function getFolderForEmbed(req, res) {
     });
   } catch (error) {
     console.error('Error in getFolderForEmbed controller:', error);
-    if (error.message === 'Operation timed out') {
+    if (error.message === 'Operation timed out' || error.message === 'File fetching timed out') {
       res.status(504).json({ error: 'Operation timed out. Please try again.' });
     } else {
       // Check if it's an authentication error

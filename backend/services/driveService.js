@@ -21,6 +21,14 @@ const publicDrive = google.drive({
   auth: API_KEY
 });
 
+// Add a timeout function for Google Drive operations
+const withTimeout = (promise, ms) => {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Operation timed out')), ms))
+  ]);
+};
+
 /**
  * Generate OAuth2 authentication URL
  * @returns {string} - Authentication URL
@@ -130,11 +138,12 @@ async function getFilesFromFolderPublic(folderId, searchTerm = '') {
       query += ` and name contains '${searchTerm}'`;
     }
     
-    const response = await publicDrive.files.list({
+    // Add timeout to Google Drive operation (10 seconds)
+    const response = await withTimeout(publicDrive.files.list({
       q: query,
       fields: 'files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, owners(displayName, emailAddress), permissions, parents)',
       orderBy: 'name'
-    });
+    }), 10000);
     
     return response.data.files || [];
   } catch (error) {
@@ -171,11 +180,12 @@ async function getFilesFromFolderPrivate(accessToken, folderId, searchTerm = '')
       query += ` and name contains '${searchTerm}'`;
     }
     
-    const response = await drive.files.list({
+    // Add timeout to Google Drive operation (10 seconds)
+    const response = await withTimeout(drive.files.list({
       q: query,
       fields: 'files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, owners(displayName, emailAddress), permissions, parents)',
       orderBy: 'name'
-    });
+    }), 10000);
     
     return response.data.files || [];
   } catch (error) {
@@ -191,10 +201,11 @@ async function getFilesFromFolderPrivate(accessToken, folderId, searchTerm = '')
  */
 async function getFileDetailsPublic(fileId) {
   try {
-    const response = await publicDrive.files.get({
+    // Add timeout to Google Drive operation (10 seconds)
+    const response = await withTimeout(publicDrive.files.get({
       fileId: fileId,
       fields: 'id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, parents, owners(displayName, emailAddress), permissions'
-    });
+    }), 10000);
     
     return response.data;
   } catch (error) {
@@ -213,10 +224,11 @@ async function getFileDetailsPrivate(accessToken, fileId) {
   try {
     const drive = getAuthenticatedDrive(accessToken);
     
-    const response = await drive.files.get({
+    // Add timeout to Google Drive operation (10 seconds)
+    const response = await withTimeout(drive.files.get({
       fileId: fileId,
       fields: 'id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, parents, owners(displayName, emailAddress), permissions'
-    });
+    }), 10000);
     
     return response.data;
   } catch (error) {
@@ -241,10 +253,11 @@ async function getFolderPath(accessToken, folderId) {
     
     // Keep going up the hierarchy until we reach the root or a limit
     while (currentId && path.length < 10) { // Limit to prevent infinite loops
-      const response = await drive.files.get({
+      // Add timeout to Google Drive operation (5 seconds)
+      const response = await withTimeout(drive.files.get({
         fileId: currentId,
         fields: 'id, name, parents'
-      });
+      }), 5000);
       
       const folder = response.data;
       path.unshift({
@@ -273,7 +286,8 @@ async function getFolderPath(accessToken, folderId) {
  */
 async function getPublicPdfContent(fileId) {
   try {
-    const response = await publicDrive.files.get(
+    // Add timeout to Google Drive operation (15 seconds)
+    const response = await withTimeout(publicDrive.files.get(
       {
         fileId: fileId,
         alt: 'media'
@@ -281,7 +295,7 @@ async function getPublicPdfContent(fileId) {
       {
         responseType: 'stream'
       }
-    );
+    ), 15000);
     
     return response.data;
   } catch (error) {

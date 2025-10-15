@@ -1,18 +1,18 @@
 const ApiKeyService = require('../services/apiKeyService');
 
 async function authenticateApiKey(req, res, next) {
-  const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+  const apiKey = req.headers['x-api-key'] || req.query.apiKey || req.query.key;
   
   if (!apiKey) {
     return res.status(401).json({ 
-      error: 'API key required. Please provide your API key in the X-API-Key header or apiKey query parameter.' 
+      error: 'API key required. Please provide your API key in the X-API-Key header or apiKey/key query parameter.' 
     });
   }
   
   try {
-    // Set a timeout for the authentication operation (5 seconds)
+    // Set a timeout for the authentication operation (8 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Authentication timed out')), 5000);
+      setTimeout(() => reject(new Error('Authentication timed out')), 8000);
     });
     
     // Authenticate the API key
