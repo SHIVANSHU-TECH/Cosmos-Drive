@@ -14,8 +14,16 @@ async function createApiKey(req, res) {
       return res.status(400).json({ error: 'Email is required' });
     }
     
+    // Set a timeout for the entire operation (10 seconds)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('API key creation timed out')), 10000);
+    });
+    
     // Create a new user with API key
-    const user = await ApiKeyService.createUser(email);
+    const userPromise = ApiKeyService.createUser(email);
+    
+    // Race between the operation and timeout
+    const user = await Promise.race([userPromise, timeoutPromise]);
     
     res.status(201).json({
       apiKey: user.apiKey,
@@ -24,7 +32,11 @@ async function createApiKey(req, res) {
     });
   } catch (error) {
     console.error('Error in createApiKey controller:', error);
-    res.status(500).json({ error: 'Failed to create API key: ' + error.message });
+    if (error.message === 'API key creation timed out') {
+      res.status(504).json({ error: 'API key creation timed out. Please try again.' });
+    } else {
+      res.status(500).json({ error: 'Failed to create API key: ' + error.message });
+    }
   }
 }
 
@@ -50,8 +62,16 @@ async function addGoogleTokens(req, res) {
       });
     }
     
+    // Set a timeout for the operation (10 seconds)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Operation timed out')), 10000);
+    });
+    
     // Add tokens to user
-    const user = await ApiKeyService.addGoogleTokensToUser(apiKey, accessToken, refreshToken);
+    const userPromise = ApiKeyService.addGoogleTokensToUser(apiKey, accessToken, refreshToken);
+    
+    // Race between the operation and timeout
+    const user = await Promise.race([userPromise, timeoutPromise]);
     
     if (!user) {
       return res.status(404).json({ 
@@ -68,7 +88,11 @@ async function addGoogleTokens(req, res) {
     });
   } catch (error) {
     console.error('Error in addGoogleTokens controller:', error);
-    res.status(500).json({ error: 'Failed to add Google tokens: ' + error.message });
+    if (error.message === 'Operation timed out') {
+      res.status(504).json({ error: 'Operation timed out. Please try again.' });
+    } else {
+      res.status(500).json({ error: 'Failed to add Google tokens: ' + error.message });
+    }
   }
 }
 
@@ -92,8 +116,15 @@ async function getFolderFiles(req, res) {
       });
     }
     
+    // Set a timeout for the operation (15 seconds)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Operation timed out')), 15000);
+    });
+    
     // Validate API key
-    const user = await ApiKeyService.getUserByApiKey(apiKey);
+    const userPromise = ApiKeyService.getUserByApiKey(apiKey);
+    const user = await Promise.race([userPromise, timeoutPromise]);
+    
     if (!user) {
       return res.status(403).json({ 
         error: 'Invalid API key. Please check your API key and try again.' 
@@ -136,15 +167,19 @@ async function getFolderFiles(req, res) {
     });
   } catch (error) {
     console.error('Error in getFolderFiles controller:', error);
-    // Check if it's an authentication error
-    if (error.code === 401 || error.code === 403) {
-      return res.status(403).json({ error: 'Access denied. Invalid or missing credentials.' });
+    if (error.message === 'Operation timed out') {
+      res.status(504).json({ error: 'Operation timed out. Please try again.' });
+    } else {
+      // Check if it's an authentication error
+      if (error.code === 401 || error.code === 403) {
+        return res.status(403).json({ error: 'Access denied. Invalid or missing credentials.' });
+      }
+      // Check if it's a "not found" error
+      if (error.code === 404) {
+        return res.status(404).json({ error: 'Folder not found.' });
+      }
+      res.status(500).json({ error: 'Failed to fetch files: ' + error.message });
     }
-    // Check if it's a "not found" error
-    if (error.code === 404) {
-      return res.status(404).json({ error: 'Folder not found.' });
-    }
-    res.status(500).json({ error: 'Failed to fetch files: ' + error.message });
   }
 }
 
@@ -167,8 +202,15 @@ async function getFolderForEmbed(req, res) {
       });
     }
     
+    // Set a timeout for the operation (15 seconds)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Operation timed out')), 15000);
+    });
+    
     // Validate API key
-    const user = await ApiKeyService.getUserByApiKey(apiKey);
+    const userPromise = ApiKeyService.getUserByApiKey(apiKey);
+    const user = await Promise.race([userPromise, timeoutPromise]);
+    
     if (!user) {
       return res.status(403).json({ 
         error: 'Invalid API key. Please check your API key and try again.' 
@@ -211,15 +253,19 @@ async function getFolderForEmbed(req, res) {
     });
   } catch (error) {
     console.error('Error in getFolderForEmbed controller:', error);
-    // Check if it's an authentication error
-    if (error.code === 401 || error.code === 403) {
-      return res.status(403).json({ error: 'Access denied. Invalid or missing credentials.' });
+    if (error.message === 'Operation timed out') {
+      res.status(504).json({ error: 'Operation timed out. Please try again.' });
+    } else {
+      // Check if it's an authentication error
+      if (error.code === 401 || error.code === 403) {
+        return res.status(403).json({ error: 'Access denied. Invalid or missing credentials.' });
+      }
+      // Check if it's a "not found" error
+      if (error.code === 404) {
+        return res.status(404).json({ error: 'Folder not found.' });
+      }
+      res.status(500).json({ error: 'Failed to fetch files: ' + error.message });
     }
-    // Check if it's a "not found" error
-    if (error.code === 404) {
-      return res.status(404).json({ error: 'Folder not found.' });
-    }
-    res.status(500).json({ error: 'Failed to fetch files: ' + error.message });
   }
 }
 
@@ -241,8 +287,15 @@ async function getFileForEmbed(req, res) {
       });
     }
     
+    // Set a timeout for the operation (10 seconds)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Operation timed out')), 10000);
+    });
+    
     // Validate API key
-    const user = await ApiKeyService.getUserByApiKey(apiKey);
+    const userPromise = ApiKeyService.getUserByApiKey(apiKey);
+    const user = await Promise.race([userPromise, timeoutPromise]);
+    
     if (!user) {
       return res.status(403).json({ 
         error: 'Invalid API key. Please check your API key and try again.' 
@@ -271,15 +324,19 @@ async function getFileForEmbed(req, res) {
     res.json(file);
   } catch (error) {
     console.error('Error in getFileForEmbed controller:', error);
-    // Check if it's an authentication error
-    if (error.code === 401 || error.code === 403) {
-      return res.status(403).json({ error: 'Access denied. Invalid or missing credentials.' });
+    if (error.message === 'Operation timed out') {
+      res.status(504).json({ error: 'Operation timed out. Please try again.' });
+    } else {
+      // Check if it's an authentication error
+      if (error.code === 401 || error.code === 403) {
+        return res.status(403).json({ error: 'Access denied. Invalid or missing credentials.' });
+      }
+      // Check if it's a "not found" error
+      if (error.code === 404) {
+        return res.status(404).json({ error: 'File not found.' });
+      }
+      res.status(500).json({ error: 'Failed to fetch file details: ' + error.message });
     }
-    // Check if it's a "not found" error
-    if (error.code === 404) {
-      return res.status(404).json({ error: 'File not found.' });
-    }
-    res.status(500).json({ error: 'Failed to fetch file details: ' + error.message });
   }
 }
 

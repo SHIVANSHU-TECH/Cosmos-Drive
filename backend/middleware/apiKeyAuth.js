@@ -10,7 +10,14 @@ async function authenticateApiKey(req, res, next) {
   }
   
   try {
-    const user = await ApiKeyService.getUserByApiKey(apiKey);
+    // Set a timeout for the authentication operation (5 seconds)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Authentication timed out')), 5000);
+    });
+    
+    // Authenticate the API key
+    const userPromise = ApiKeyService.getUserByApiKey(apiKey);
+    const user = await Promise.race([userPromise, timeoutPromise]);
     
     if (!user) {
       return res.status(403).json({ 
@@ -23,9 +30,15 @@ async function authenticateApiKey(req, res, next) {
     next();
   } catch (error) {
     console.error('Error authenticating API key:', error);
-    return res.status(500).json({ 
-      error: 'Authentication error: ' + error.message 
-    });
+    if (error.message === 'Authentication timed out') {
+      return res.status(504).json({ 
+        error: 'Authentication timed out. Please try again.' 
+      });
+    } else {
+      return res.status(500).json({ 
+        error: 'Authentication error: ' + error.message 
+      });
+    }
   }
 }
 

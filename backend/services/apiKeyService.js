@@ -15,6 +15,14 @@ const { db, admin } = firebaseModule;
 // Fallback to in-memory storage if Firebase is not configured
 let users = new Map();
 
+// Add a timeout function for Firebase operations
+const withTimeout = (promise, ms) => {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Operation timed out')), ms))
+  ]);
+};
+
 class ApiKeyService {
   // Generate a new API key
   static generateApiKey() {
@@ -30,7 +38,8 @@ class ApiKeyService {
     // If Firebase is configured, save to Realtime Database
     if (db) {
       try {
-        await db.ref('users/' + apiKey).set({
+        // Add timeout to Firebase operation (5 seconds)
+        await withTimeout(db.ref('users/' + apiKey).set({
           id: user.id,
           email: user.email,
           apiKey: user.apiKey,
@@ -38,7 +47,7 @@ class ApiKeyService {
           googleRefreshToken: user.googleRefreshToken,
           createdAt: user.createdAt.toISOString(),
           lastAccessed: user.lastAccessed.toISOString()
-        });
+        }), 5000);
       } catch (error) {
         console.error('Failed to save user to Firebase, using in-memory storage:', error.message);
         users.set(apiKey, user);
@@ -56,7 +65,8 @@ class ApiKeyService {
     // If Firebase is configured, get from Realtime Database
     if (db) {
       try {
-        const snapshot = await db.ref('users/' + apiKey).once('value');
+        // Add timeout to Firebase operation (5 seconds)
+        const snapshot = await withTimeout(db.ref('users/' + apiKey).once('value'), 5000);
         if (!snapshot.exists()) {
           return null;
         }
@@ -74,9 +84,9 @@ class ApiKeyService {
         
         // Update last accessed time
         user.updateLastAccessed();
-        await db.ref('users/' + apiKey).update({
+        await withTimeout(db.ref('users/' + apiKey).update({
           lastAccessed: user.lastAccessed.toISOString()
-        });
+        }), 5000);
         
         return user;
       } catch (error) {
@@ -103,7 +113,8 @@ class ApiKeyService {
     // If Firebase is configured, update in Realtime Database
     if (db) {
       try {
-        const snapshot = await db.ref('users/' + apiKey).once('value');
+        // Add timeout to Firebase operation (5 seconds)
+        const snapshot = await withTimeout(db.ref('users/' + apiKey).once('value'), 5000);
         if (!snapshot.exists()) {
           return null;
         }
@@ -120,11 +131,11 @@ class ApiKeyService {
         user.lastAccessed = new Date(userData.lastAccessed);
         
         // Update tokens in Realtime Database
-        await db.ref('users/' + apiKey).update({
+        await withTimeout(db.ref('users/' + apiKey).update({
           googleAccessToken: accessToken,
           googleRefreshToken: refreshToken,
           lastAccessed: user.lastAccessed.toISOString()
-        });
+        }), 5000);
         
         return user;
       } catch (error) {
@@ -153,7 +164,8 @@ class ApiKeyService {
     // If Firebase is configured, get all from Realtime Database
     if (db) {
       try {
-        const snapshot = await db.ref('users').once('value');
+        // Add timeout to Firebase operation (5 seconds)
+        const snapshot = await withTimeout(db.ref('users').once('value'), 5000);
         const users = [];
         
         if (snapshot.exists()) {
@@ -189,7 +201,8 @@ class ApiKeyService {
     // If Firebase is configured, delete from Realtime Database
     if (db) {
       try {
-        await db.ref('users/' + apiKey).remove();
+        // Add timeout to Firebase operation (5 seconds)
+        await withTimeout(db.ref('users/' + apiKey).remove(), 5000);
         return true;
       } catch (error) {
         console.error('Failed to delete user from Firebase, deleting from in-memory storage:', error.message);
