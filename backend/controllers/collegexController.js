@@ -14,9 +14,9 @@ async function createApiKey(req, res) {
       return res.status(400).json({ error: 'Email is required' });
     }
     
-    // Set a timeout for the entire operation (10 seconds)
+    // Set a longer timeout for the entire operation (30 seconds) to account for retries
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('API key creation timed out')), 10000);
+      setTimeout(() => reject(new Error('API key creation timed out')), 30000);
     });
     
     // Create a new user with API key

@@ -113,17 +113,17 @@ setInterval(async () => {
 }, 5 * 60 * 1000); // 5 minutes
 
 // Add a timeout function for Firebase operations with retry logic
-const withTimeoutAndRetry = async (operation, ms = 5000, retries = 3) => {
+const withTimeoutAndRetry = async (operation, ms = 3000, retries = 2) => {
   for (let i = 0; i < retries; i++) {
     try {
       return await Promise.race([
         operation(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Operation timed out')), ms))
-      ]);
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Operation timed out')), ms))
+  ]);
     } catch (error) {
       if (i === retries - 1) throw error;
       console.log(`Firebase operation failed, retrying... (${i + 1}/${retries})`);
-      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
+      await new Promise(resolve => setTimeout(resolve, 500 * (i + 1))); // Faster retry with shorter backoff
     }
   }
 };
@@ -153,7 +153,7 @@ class ApiKeyService {
             createdAt: user.createdAt.toISOString(),
             lastAccessed: user.lastAccessed.toISOString()
           });
-        }, 5000, 3);
+        }, 3000, 2);
         console.log('User saved to Firebase successfully');
       } catch (error) {
         console.error('Failed to save user to Firebase after retries, using persistent fallback:', error.message);
@@ -198,7 +198,7 @@ class ApiKeyService {
         try {
           await withTimeoutAndRetry(async () => {
             await db.ref('users/' + apiKey).update({
-              lastAccessed: user.lastAccessed.toISOString()
+          lastAccessed: user.lastAccessed.toISOString()
             });
           }, 5000, 2);
         } catch (updateError) {
@@ -254,9 +254,9 @@ class ApiKeyService {
         // Update tokens in Realtime Database with retry logic
         await withTimeoutAndRetry(async () => {
           await db.ref('users/' + apiKey).update({
-            googleAccessToken: accessToken,
-            googleRefreshToken: refreshToken,
-            lastAccessed: user.lastAccessed.toISOString()
+          googleAccessToken: accessToken,
+          googleRefreshToken: refreshToken,
+          lastAccessed: user.lastAccessed.toISOString()
           });
         }, 5000, 3);
         
