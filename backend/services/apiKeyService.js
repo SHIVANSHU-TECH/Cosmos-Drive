@@ -75,13 +75,17 @@ const saveUsersToFile = async () => {
 // Initialize persistent storage on startup
 loadUsersFromFile();
 
-// Periodic sync between Firebase and persistent storage (every 5 minutes)
+// Periodic sync between Firebase and persistent storage (every 10 minutes)
 setInterval(async () => {
   if (db && users.size > 0) {
     try {
       console.log('Performing periodic sync with Firebase...');
-      const snapshot = await db.ref('users').once('value');
+      const snapshot = await withTimeoutAndRetry(async () => {
+        return await db.ref('users').once('value');
+      }, 5000, 1);
+      
       if (snapshot.exists()) {
+        let updated = false;
         // Update local storage with any changes from Firebase
         snapshot.forEach(childSnapshot => {
           const userData = childSnapshot.val();
@@ -101,16 +105,20 @@ setInterval(async () => {
             user.createdAt = new Date(userData.createdAt);
             user.lastAccessed = new Date(userData.lastAccessed);
             users.set(childSnapshot.key, user);
+            updated = true;
           }
         });
-        await saveUsersToFile();
-        console.log('Periodic sync completed successfully');
+        
+        if (updated) {
+          await saveUsersToFile();
+          console.log('Periodic sync completed successfully');
+        }
       }
     } catch (error) {
       console.warn('Periodic sync failed:', error.message);
     }
   }
-}, 5 * 60 * 1000); // 5 minutes
+}, 10 * 60 * 1000); // 10 minutes
 
 // Add a timeout function for Firebase operations with retry logic
 const withTimeoutAndRetry = async (operation, ms = 3000, retries = 2) => {
@@ -140,43 +148,67 @@ class ApiKeyService {
     const userId = crypto.randomBytes(16).toString('hex');
     const user = new User(userId, email, apiKey);
     
-    // If Firebase is configured, try to save to Realtime Database with retry logic
+    // Always save to persistent storage first for immediate availability
+    users.set(apiKey, user);
+    await saveUsersToFile();
+    
+    // Try to sync with Firebase in background (non-blocking)
     if (db) {
-      try {
-        await withTimeoutAndRetry(async () => {
-          await db.ref('users/' + apiKey).set({
-            id: user.id,
-            email: user.email,
-            apiKey: user.apiKey,
-            googleAccessToken: user.googleAccessToken,
-            googleRefreshToken: user.googleRefreshToken,
-            createdAt: user.createdAt.toISOString(),
-            lastAccessed: user.lastAccessed.toISOString()
-          });
-        }, 3000, 2);
-        console.log('User saved to Firebase successfully');
-      } catch (error) {
-        console.error('Failed to save user to Firebase after retries, using persistent fallback:', error.message);
-        users.set(apiKey, user);
-        await saveUsersToFile(); // Save to persistent storage
-      }
-    } else {
-      // Fallback to persistent storage
-      users.set(apiKey, user);
-      await saveUsersToFile();
+      this.syncUserToFirebaseOnCreate(user).catch(error => {
+        console.warn('Background Firebase sync failed:', error.message);
+      });
     }
     
     return user;
   }
+  
+  // Background sync method for user creation (non-blocking)
+  static async syncUserToFirebaseOnCreate(user) {
+    if (!db) return;
+    
+    try {
+      await withTimeoutAndRetry(async () => {
+        await db.ref('users/' + user.apiKey).set({
+          id: user.id,
+          email: user.email,
+          apiKey: user.apiKey,
+          googleAccessToken: user.googleAccessToken,
+          googleRefreshToken: user.googleRefreshToken,
+          createdAt: user.createdAt.toISOString(),
+          lastAccessed: user.lastAccessed.toISOString()
+        });
+      }, 3000, 2);
+      console.log('User synced to Firebase successfully');
+    } catch (error) {
+      console.warn('Background Firebase sync failed:', error.message);
+    }
+  }
 
   // Get user by API key
   static async getUserByApiKey(apiKey) {
-    // If Firebase is configured, get from Realtime Database
+    // Always check persistent storage first for fast response
+    const user = users.get(apiKey);
+    if (user) {
+      user.updateLastAccessed();
+      // Save to persistent storage immediately
+      await saveUsersToFile();
+      
+      // Try to sync with Firebase in background (non-blocking)
+      if (db) {
+        this.syncUserToFirebase(user).catch(error => {
+          console.warn('Background Firebase sync failed:', error.message);
+        });
+      }
+      
+      return user;
+    }
+    
+    // If not found in persistent storage and Firebase is configured, try Firebase
     if (db) {
       try {
         const snapshot = await withTimeoutAndRetry(async () => {
           return await db.ref('users/' + apiKey).once('value');
-        }, 8000, 3);
+        }, 5000, 2);
         
         if (!snapshot.exists()) {
           return null;
@@ -193,95 +225,74 @@ class ApiKeyService {
         user.createdAt = new Date(userData.createdAt);
         user.lastAccessed = new Date(userData.lastAccessed);
         
-        // Update last accessed time with retry logic
-        user.updateLastAccessed();
-        try {
-          await withTimeoutAndRetry(async () => {
-            await db.ref('users/' + apiKey).update({
-          lastAccessed: user.lastAccessed.toISOString()
-            });
-          }, 5000, 2);
-        } catch (updateError) {
-          console.warn('Failed to update last accessed time in Firebase:', updateError.message);
-        }
+        // Add to persistent storage for future fast access
+        users.set(apiKey, user);
+        await saveUsersToFile();
         
         return user;
       } catch (error) {
-        console.error('Failed to get user from Firebase after retries, checking persistent storage:', error.message);
-        // Fallback to persistent storage
-        const user = users.get(apiKey);
-        if (user) {
-          user.updateLastAccessed();
-          await saveUsersToFile(); // Keep persistent storage updated
-        }
-        return user;
+        console.error('Failed to get user from Firebase:', error.message);
+        return null;
       }
-    } else {
-      // Fallback to persistent storage
-      const user = users.get(apiKey);
-      if (user) {
-        user.updateLastAccessed();
-        await saveUsersToFile(); // Keep persistent storage updated
-      }
-      return user;
+    }
+    
+    return null;
+  }
+  
+  // Background sync method (non-blocking)
+  static async syncUserToFirebase(user) {
+    if (!db) return;
+    
+    try {
+      await withTimeoutAndRetry(async () => {
+        await db.ref('users/' + user.apiKey).update({
+          lastAccessed: user.lastAccessed.toISOString()
+        });
+      }, 3000, 1);
+    } catch (error) {
+      // Silently fail - this is background operation
+      console.warn('Background Firebase sync failed:', error.message);
     }
   }
 
   // Add Google tokens to user
   static async addGoogleTokensToUser(apiKey, accessToken, refreshToken) {
-    // If Firebase is configured, update in Realtime Database
+    // Check persistent storage first
+    let user = users.get(apiKey);
+    if (!user) {
+      return null;
+    }
+    
+    // Update tokens in persistent storage immediately
+    user.setGoogleTokens(accessToken, refreshToken);
+    user.updateLastAccessed();
+    await saveUsersToFile();
+    
+    // Try to sync with Firebase in background (non-blocking)
     if (db) {
-      try {
-        const snapshot = await withTimeoutAndRetry(async () => {
-          return await db.ref('users/' + apiKey).once('value');
-        }, 8000, 3);
-        
-        if (!snapshot.exists()) {
-          return null;
-        }
-        
-        const userData = snapshot.val();
-        const user = new User(
-          userData.id,
-          userData.email,
-          userData.apiKey,
-          accessToken,
-          refreshToken
-        );
-        user.createdAt = new Date(userData.createdAt);
-        user.lastAccessed = new Date(userData.lastAccessed);
-        
-        // Update tokens in Realtime Database with retry logic
-        await withTimeoutAndRetry(async () => {
-          await db.ref('users/' + apiKey).update({
+      this.syncGoogleTokensToFirebase(apiKey, accessToken, refreshToken).catch(error => {
+        console.warn('Background Firebase sync failed:', error.message);
+      });
+    }
+    
+    return user;
+  }
+  
+  // Background sync method for Google tokens (non-blocking)
+  static async syncGoogleTokensToFirebase(apiKey, accessToken, refreshToken) {
+    if (!db) return;
+    
+    try {
+      await withTimeoutAndRetry(async () => {
+        await db.ref('users/' + apiKey).update({
           googleAccessToken: accessToken,
           googleRefreshToken: refreshToken,
-          lastAccessed: user.lastAccessed.toISOString()
-          });
-        }, 5000, 3);
-        
-        console.log('Google tokens updated in Firebase successfully');
-        return user;
-      } catch (error) {
-        console.error('Failed to update user in Firebase after retries, updating persistent storage:', error.message);
-        // Fallback to persistent storage
-        const user = users.get(apiKey);
-        if (user) {
-          user.setGoogleTokens(accessToken, refreshToken);
-          user.updateLastAccessed();
-          await saveUsersToFile(); // Keep persistent storage updated
-        }
-        return user;
-      }
-    } else {
-      // Fallback to persistent storage
-      const user = users.get(apiKey);
-      if (user) {
-        user.setGoogleTokens(accessToken, refreshToken);
-        user.updateLastAccessed();
-        await saveUsersToFile(); // Keep persistent storage updated
-      }
-      return user;
+          lastAccessed: new Date().toISOString()
+        });
+      }, 3000, 2);
+      console.log('Google tokens synced to Firebase successfully');
+    } catch (error) {
+      console.warn('Background Firebase sync failed:', error.message);
     }
   }
 

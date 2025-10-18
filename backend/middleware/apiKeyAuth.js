@@ -10,12 +10,12 @@ async function authenticateApiKey(req, res, next) {
   }
   
   try {
-    // Set a longer timeout for the authentication operation (25 seconds) to account for retries
+    // Set a reasonable timeout for authentication (15 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Authentication timed out')), 25000);
+      setTimeout(() => reject(new Error('Authentication timed out')), 15000);
     });
     
-    // Authenticate the API key
+    // Authenticate the API key with timeout protection
     const userPromise = ApiKeyService.getUserByApiKey(apiKey);
     const user = await Promise.race([userPromise, timeoutPromise]);
     
