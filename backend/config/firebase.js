@@ -34,6 +34,8 @@ try {
       }
 
       db = admin.database(); // Use Realtime Database instead of Firestore
+      
+      // Test the connection (async, but we'll handle it in the service layer)
       console.log('Firebase initialized successfully');
     } catch (initError) {
       console.warn('Firebase initialization failed:', initError.message);
