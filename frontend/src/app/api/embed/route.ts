@@ -26,11 +26,17 @@ export async function GET(request: Request) {
     // Forward the request to our backend server with API key in header
     const backendUrl = `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/embed/folder/${folderId}`;
     
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
+    
     const response = await fetch(backendUrl, {
       headers: {
         'X-API-Key': apiKey
-      }
+      },
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeoutId);
     
     // Handle authentication errors
     if (response.status === 401 || response.status === 403) {
@@ -51,6 +57,12 @@ export async function GET(request: Request) {
     return NextResponse.json(result);
   } catch (error) {
     console.error('Error proxying embed request:', error);
+    if (error.name === 'AbortError') {
+      return NextResponse.json(
+        { error: 'Request timed out. Please try again.' },
+        { status: 504 }
+      );
+    }
     return NextResponse.json(
       { error: 'Failed to fetch folder contents' },
       { status: 500 }

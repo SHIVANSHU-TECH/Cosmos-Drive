@@ -50,17 +50,17 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(data);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error creating API key:', error);
-    if (error.name === 'AbortError') {
+    if (typeof error === 'object' && error !== null && 'name' in error && (error as any).name === 'AbortError') {
       return NextResponse.json(
         { error: 'Request timed out. Please try again.' },
         { status: 504 }
       );
+    }
     }
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     );
   }
-}
