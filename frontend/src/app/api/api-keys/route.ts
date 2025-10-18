@@ -58,9 +58,9 @@ export async function POST(request: Request) {
         { status: 504 }
       );
     }
-    }
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     );
   }
+}
