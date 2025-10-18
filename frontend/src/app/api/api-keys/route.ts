@@ -21,13 +21,19 @@ export async function POST(request: Request) {
     
     console.log('Forwarding API key request to backend:', `${cleanBackendUrl}/api/users/key`);
     
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 35000); // 35 seconds timeout
+    
     const backendResponse = await fetch(`${cleanBackendUrl}/api/users/key`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ email }),
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeoutId);
 
     const data = await backendResponse.json();
 
@@ -46,6 +52,12 @@ export async function POST(request: Request) {
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error creating API key:', error);
+    if (error.name === 'AbortError') {
+      return NextResponse.json(
+        { error: 'Request timed out. Please try again.' },
+        { status: 504 }
+      );
+    }
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
