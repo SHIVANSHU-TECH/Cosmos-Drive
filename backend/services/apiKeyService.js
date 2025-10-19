@@ -164,51 +164,77 @@ class ApiKeyService {
   
   // Background sync method for user creation (non-blocking)
   static async syncUserToFirebaseOnCreate(user) {
-    if (!db) return;
-    
-    try {
-      await withTimeoutAndRetry(async () => {
-        await db.ref('users/' + user.apiKey).set({
-          id: user.id,
-          email: user.email,
-          apiKey: user.apiKey,
-          googleAccessToken: user.googleAccessToken,
-          googleRefreshToken: user.googleRefreshToken,
-          createdAt: user.createdAt.toISOString(),
-          lastAccessed: user.lastAccessed.toISOString()
-        });
-      }, 3000, 2);
-      console.log('User synced to Firebase successfully');
-    } catch (error) {
-      console.warn('Background Firebase sync failed:', error.message);
+    if (!db) {
+      console.log('Firebase not available, skipping sync');
+      return;
     }
+    
+    // Use setTimeout to make it non-blocking but ensure it runs
+    setTimeout(async () => {
+      try {
+        console.log('Attempting to sync user to Firebase:', user.email);
+        await withTimeoutAndRetry(async () => {
+          await db.ref('users/' + user.apiKey).set({
+            id: user.id,
+            email: user.email,
+            apiKey: user.apiKey,
+            googleAccessToken: user.googleAccessToken,
+            googleRefreshToken: user.googleRefreshToken,
+            createdAt: user.createdAt.toISOString(),
+            lastAccessed: user.lastAccessed.toISOString()
+          });
+        }, 5000, 3);
+        console.log('✅ User synced to Firebase successfully:', user.email);
+      } catch (error) {
+        console.warn('❌ Background Firebase sync failed:', error.message);
+        // Retry once more after a delay
+        setTimeout(async () => {
+          try {
+            await db.ref('users/' + user.apiKey).set({
+              id: user.id,
+              email: user.email,
+              apiKey: user.apiKey,
+              googleAccessToken: user.googleAccessToken,
+              googleRefreshToken: user.googleRefreshToken,
+              createdAt: user.createdAt.toISOString(),
+              lastAccessed: user.lastAccessed.toISOString()
+            });
+            console.log('✅ User synced to Firebase on retry:', user.email);
+          } catch (retryError) {
+            console.warn('❌ Firebase sync retry failed:', retryError.message);
+          }
+        }, 5000);
+      }
+    }, 1000); // 1 second delay to ensure it runs
   }
 
   // Get user by API key
   static async getUserByApiKey(apiKey) {
-    // Always check persistent storage first for fast response
+    // ALWAYS check persistent storage first - this is the primary source
     const user = users.get(apiKey);
     if (user) {
       user.updateLastAccessed();
-      // Save to persistent storage immediately
-      await saveUsersToFile();
+      // Save to persistent storage immediately (non-blocking)
+      saveUsersToFile().catch(error => {
+        console.warn('Failed to save to persistent storage:', error.message);
+      });
       
-      // Try to sync with Firebase in background (non-blocking)
+      // Try to sync with Firebase in background (completely non-blocking)
       if (db) {
         this.syncUserToFirebase(user).catch(error => {
-          console.warn('Background Firebase sync failed:', error.message);
+          // Silently fail - this is background operation
         });
       }
       
       return user;
     }
     
-    // If not found in persistent storage and Firebase is configured, try Firebase
+    // Only if not found in persistent storage, try Firebase (but with very short timeout)
     if (db) {
       try {
         const snapshot = await withTimeoutAndRetry(async () => {
           return await db.ref('users/' + apiKey).once('value');
-        }, 5000, 2);
+        }, 2000, 1); // Very short timeout, only 1 retry
         
         if (!snapshot.exists()) {
           return null;
@@ -231,7 +257,8 @@ class ApiKeyService {
         
         return user;
       } catch (error) {
-        console.error('Failed to get user from Firebase:', error.message);
+        // Silently fail - Firebase is not critical
+        console.warn('Firebase lookup failed, user not found in persistent storage');
         return null;
       }
     }
@@ -239,20 +266,27 @@ class ApiKeyService {
     return null;
   }
   
-  // Background sync method (non-blocking)
+  // Background sync method (completely non-blocking)
   static async syncUserToFirebase(user) {
-    if (!db) return;
-    
-    try {
-      await withTimeoutAndRetry(async () => {
-        await db.ref('users/' + user.apiKey).update({
-          lastAccessed: user.lastAccessed.toISOString()
-        });
-      }, 3000, 1);
-    } catch (error) {
-      // Silently fail - this is background operation
-      console.warn('Background Firebase sync failed:', error.message);
+    if (!db) {
+      console.log('Firebase not available for sync');
+      return;
     }
+    
+    // Use setTimeout to make it completely non-blocking
+    setTimeout(async () => {
+      try {
+        console.log('Syncing user to Firebase:', user.email);
+        await withTimeoutAndRetry(async () => {
+          await db.ref('users/' + user.apiKey).update({
+            lastAccessed: user.lastAccessed.toISOString()
+          });
+        }, 3000, 2);
+        console.log('✅ User sync to Firebase successful:', user.email);
+      } catch (error) {
+        console.warn('❌ Background Firebase sync failed:', error.message);
+      }
+    }, 0);
   }
 
   // Add Google tokens to user
@@ -377,6 +411,41 @@ class ApiKeyService {
       },
       folderId
     };
+  }
+  
+  // Force sync all users to Firebase (for initial setup)
+  static async syncAllUsersToFirebase() {
+    if (!db) {
+      console.log('Firebase not available, cannot sync users');
+      return;
+    }
+    
+    console.log('🔄 Starting bulk sync of all users to Firebase...');
+    let syncedCount = 0;
+    let failedCount = 0;
+    
+    for (const [apiKey, user] of users.entries()) {
+      try {
+        await withTimeoutAndRetry(async () => {
+          await db.ref('users/' + apiKey).set({
+            id: user.id,
+            email: user.email,
+            apiKey: user.apiKey,
+            googleAccessToken: user.googleAccessToken,
+            googleRefreshToken: user.googleRefreshToken,
+            createdAt: user.createdAt.toISOString(),
+            lastAccessed: user.lastAccessed.toISOString()
+          });
+        }, 5000, 2);
+        syncedCount++;
+        console.log(`✅ Synced user ${syncedCount}: ${user.email}`);
+      } catch (error) {
+        failedCount++;
+        console.warn(`❌ Failed to sync user: ${user.email} - ${error.message}`);
+      }
+    }
+    
+    console.log(`🎉 Bulk sync completed: ${syncedCount} successful, ${failedCount} failed`);
   }
 }
 
