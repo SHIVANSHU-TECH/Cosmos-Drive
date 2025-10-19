@@ -531,3 +531,159 @@ app.get('/api/diag/env', (req, res) => {
     PORT: process.env.PORT
   });
 });
+
+// Add a new endpoint for downloading files through proxy to hide Google Drive links
+app.get('/api/public/drive/file/:fileId', async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    
+    console.log('Public file download request for file ID:', fileId);
+    
+    // Check if API_KEY is available
+    if (!API_KEY) {
+      console.error('API_KEY is not configured');
+      return res.status(500).json({ error: 'Server configuration error: API key not available' });
+    }
+    
+    // Use public drive client
+    const drive = google.drive({
+      version: 'v3',
+      auth: API_KEY
+    });
+    
+    // Get file metadata first to check if it exists and get download URL
+    const metadataResponse = await drive.files.get({
+      fileId: fileId,
+      fields: 'name, mimeType, webContentLink'
+    });
+    
+    const fileMetadata = metadataResponse.data;
+    
+    // Set appropriate headers for the file
+    res.set('Content-Type', fileMetadata.mimeType);
+    res.set('Content-Disposition', `attachment; filename="${fileMetadata.name}"`);
+    
+    // Stream the file content directly from Google Drive
+    const fileResponse = await drive.files.get(
+      {
+        fileId: fileId,
+        alt: 'media'
+      },
+      {
+        responseType: 'stream'
+      }
+    );
+    
+    // Handle stream events
+    fileResponse.data.on('error', (err) => {
+      console.error('Error streaming file:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to stream file: ' + err.message });
+      }
+    });
+    
+    // Pipe the file stream to the response
+    fileResponse.data.pipe(res);
+  } catch (error) {
+    console.error('Error downloading public file for file ID:', req.params.fileId, error);
+    
+    // Handle specific error cases
+    if (error.code === 404) {
+      return res.status(404).json({ error: 'File not found' });
+    } else if (error.code === 403) {
+      return res.status(403).json({ error: 'Access denied to file. File may not be publicly accessible.' });
+    } else if (error.code === 401) {
+      return res.status(401).json({ error: 'Invalid API key' });
+    }
+    
+    // Check if headers have already been sent
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to download file: ' + error.message });
+    }
+  }
+});
+
+// Add a new endpoint for downloading files through proxy with authentication
+app.get('/api/private/drive/file/:fileId', authenticateToken, async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    
+    console.log('Private file download request for file ID:', fileId);
+    
+    if (!token) {
+      console.log('No token provided for file download');
+      return res.status(401).json({ error: 'Access token required' });
+    }
+    
+    // Check if OAuth credentials are available
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+      console.error('OAuth credentials are not configured');
+      return res.status(500).json({ error: 'Server configuration error: OAuth credentials not available' });
+    }
+    
+    // Create authenticated drive client
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.REDIRECT_URI || 'http://localhost:3000/auth/callback'
+    );
+    oauth2Client.setCredentials({ access_token: token });
+    
+    const drive = google.drive({
+      version: 'v3',
+      auth: oauth2Client
+    });
+    
+    // Get file metadata first to check if it exists and get download URL
+    const metadataResponse = await drive.files.get({
+      fileId: fileId,
+      fields: 'name, mimeType, webContentLink'
+    });
+    
+    const fileMetadata = metadataResponse.data;
+    
+    // Set appropriate headers for the file
+    res.set('Content-Type', fileMetadata.mimeType);
+    res.set('Content-Disposition', `attachment; filename="${fileMetadata.name}"`);
+    
+    // Stream the file content directly from Google Drive
+    const fileResponse = await drive.files.get(
+      {
+        fileId: fileId,
+        alt: 'media'
+      },
+      {
+        responseType: 'stream'
+      }
+    );
+    
+    // Handle stream events
+    fileResponse.data.on('error', (err) => {
+      console.error('Error streaming file:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to stream file: ' + err.message });
+      }
+    });
+    
+    // Pipe the file stream to the response
+    fileResponse.data.pipe(res);
+  } catch (error) {
+    console.error('Error downloading private file for file ID:', req.params.fileId, error);
+    
+    // Handle specific error cases
+    if (error.code === 404) {
+      return res.status(404).json({ error: 'File not found' });
+    } else if (error.code === 403) {
+      return res.status(403).json({ error: 'Access denied to file' });
+    } else if (error.code === 401) {
+      return res.status(401).json({ error: 'Invalid or expired access token' });
+    }
+    
+    // Check if headers have already been sent
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to download file: ' + error.message });
+    }
+  }
+});
