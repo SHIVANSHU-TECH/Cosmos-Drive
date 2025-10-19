@@ -202,9 +202,9 @@ async function getFolderForEmbed(req, res) {
       });
     }
     
-    // Set a longer timeout for the operation (25 seconds) to account for retries
+    // Set a reasonable timeout for the operation (15 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Operation timed out')), 25000);
+      setTimeout(() => reject(new Error('Operation timed out')), 15000);
     });
     
     // Validate API key
@@ -223,9 +223,9 @@ async function getFolderForEmbed(req, res) {
       return res.status(400).json({ error: 'Folder ID is required' });
     }
     
-    // Set a timeout for the file fetching operation (20 seconds)
+    // Set a timeout for the file fetching operation (12 seconds)
     const fileFetchTimeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('File fetching timed out')), 20000);
+      setTimeout(() => reject(new Error('File fetching timed out')), 12000);
     });
     
     let files;

@@ -21,6 +21,10 @@ const publicDrive = google.drive({
   auth: API_KEY
 });
 
+// Simple in-memory cache for file metadata (5 minutes cache)
+const fileCache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 // Add a timeout function for Google Drive operations
 const withTimeout = (promise, ms) => {
   return Promise.race([
@@ -28,6 +32,23 @@ const withTimeout = (promise, ms) => {
     new Promise((_, reject) => setTimeout(() => reject(new Error('Operation timed out')), ms))
   ]);
 };
+
+// Cache management functions
+function getCachedData(key) {
+  const cached = fileCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+  fileCache.delete(key);
+  return null;
+}
+
+function setCachedData(key, data) {
+  fileCache.set(key, {
+    data,
+    timestamp: Date.now()
+  });
+}
 
 /**
  * Generate OAuth2 authentication URL
@@ -131,6 +152,14 @@ function getAuthenticatedDrive(accessToken) {
  */
 async function getFilesFromFolderPublic(folderId, searchTerm = '') {
   try {
+    // Check cache first
+    const cacheKey = `public_${folderId}_${searchTerm}`;
+    const cachedData = getCachedData(cacheKey);
+    if (cachedData) {
+      console.log('Returning cached data for folder:', folderId);
+      return cachedData;
+    }
+    
     let query = `'${folderId}' in parents and trashed = false`;
     
     // Add search term to query if provided
@@ -138,14 +167,19 @@ async function getFilesFromFolderPublic(folderId, searchTerm = '') {
       query += ` and name contains '${searchTerm}'`;
     }
     
-    // Add timeout to Google Drive operation (10 seconds)
+    // Add timeout to Google Drive operation (8 seconds for better performance)
     const response = await withTimeout(publicDrive.files.list({
       q: query,
       fields: 'files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, owners(displayName, emailAddress), permissions, parents)',
       orderBy: 'name'
-    }), 10000);
+    }), 8000);
     
-    return response.data.files || [];
+    const files = response.data.files || [];
+    
+    // Cache the results
+    setCachedData(cacheKey, files);
+    
+    return files;
   } catch (error) {
     console.error('Error fetching files from folder (public):', error);
     
@@ -171,6 +205,14 @@ async function getFilesFromFolderPublic(folderId, searchTerm = '') {
  */
 async function getFilesFromFolderPrivate(accessToken, folderId, searchTerm = '') {
   try {
+    // Check cache first
+    const cacheKey = `private_${folderId}_${accessToken.substring(0, 10)}_${searchTerm}`;
+    const cachedData = getCachedData(cacheKey);
+    if (cachedData) {
+      console.log('Returning cached data for private folder:', folderId);
+      return cachedData;
+    }
+    
     const drive = getAuthenticatedDrive(accessToken);
     
     let query = `'${folderId}' in parents and trashed = false`;
@@ -180,14 +222,19 @@ async function getFilesFromFolderPrivate(accessToken, folderId, searchTerm = '')
       query += ` and name contains '${searchTerm}'`;
     }
     
-    // Add timeout to Google Drive operation (10 seconds)
+    // Add timeout to Google Drive operation (8 seconds for better performance)
     const response = await withTimeout(drive.files.list({
       q: query,
       fields: 'files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, owners(displayName, emailAddress), permissions, parents)',
       orderBy: 'name'
-    }), 10000);
+    }), 8000);
     
-    return response.data.files || [];
+    const files = response.data.files || [];
+    
+    // Cache the results
+    setCachedData(cacheKey, files);
+    
+    return files;
   } catch (error) {
     console.error('Error fetching files from folder (private):', error);
     throw error;
