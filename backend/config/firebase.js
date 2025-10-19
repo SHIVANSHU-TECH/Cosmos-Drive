@@ -24,25 +24,15 @@ try {
     admin = null;
     db = null;
   } else {
-    try {
-      // Initialize Firebase Admin SDK
-      if (!admin.apps.length) {
-        admin.initializeApp({
-          credential: admin.credential.cert(serviceAccount),
-          databaseURL: `https://${process.env.FIREBASE_PROJECT_ID}.firebaseio.com`
-        });
-      }
-
-      db = admin.database(); // Use Realtime Database instead of Firestore
-      
-      // Test the connection (async, but we'll handle it in the service layer)
-      console.log('Firebase initialized successfully');
-    } catch (initError) {
-      console.warn('Firebase initialization failed:', initError.message);
-      console.warn('Firebase features will be disabled.');
-      admin = null;
-      db = null;
+    // Initialize Firebase Admin SDK with the correct database URL
+    if (!admin.apps.length) {
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        databaseURL: `https://${process.env.FIREBASE_PROJECT_ID}-default-rtdb.firebaseio.com`
+      });
     }
+
+    db = admin.database(); // Use Realtime Database instead of Firestore
   }
 } catch (error) {
   console.warn('Firebase initialization failed:', error.message);
