@@ -421,6 +421,45 @@ function GridView({
     }
   };
   
+  // Function to handle download through backend proxy to hide Google Drive links
+  const handleDownload = async (file: DriveFile) => {
+    try {
+      // Use our backend proxy to download the file without exposing Google Drive links
+      const response = await fetch(`/api/public/drive/file/${file.id}`);
+      if (response.ok) {
+        // Create a temporary link to trigger download
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        // Fallback to direct download if proxy fails
+        const link = document.createElement('a');
+        link.href = file.webContentLink || file.webViewLink || '';
+        link.download = file.name;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
+      // Fallback to direct download if proxy fails
+      const link = document.createElement('a');
+      link.href = file.webContentLink || file.webViewLink || '';
+      link.download = file.name;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+  
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
       {files.map((file) => (
@@ -443,17 +482,14 @@ function GridView({
               >
                 Open
               </button>
-            ) : (
-              <a 
-                href={file.webContentLink || file.webViewLink} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                download={file.name}
+            ) : allowDownload ? (
+              <button
+                onClick={() => handleDownload(file)}
                 className="flex-1 min-w-[80px] text-center px-3 py-1.5 text-sm font-medium bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
               >
                 Download
-              </a>
-            )}
+              </button>
+            ) : null}
             
             {file.mimeType === 'application/pdf' ? (
               <button
@@ -523,6 +559,45 @@ function TableView({
     }
   };
   
+  // Function to handle download through backend proxy to hide Google Drive links
+  const handleDownload = async (file: DriveFile) => {
+    try {
+      // Use our backend proxy to download the file without exposing Google Drive links
+      const response = await fetch(`/api/public/drive/file/${file.id}`);
+      if (response.ok) {
+        // Create a temporary link to trigger download
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        // Fallback to direct download if proxy fails
+        const link = document.createElement('a');
+        link.href = file.webContentLink || file.webViewLink || '';
+        link.download = file.name;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
+      // Fallback to direct download if proxy fails
+      const link = document.createElement('a');
+      link.href = file.webContentLink || file.webViewLink || '';
+      link.download = file.name;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+  
   return (
     <div className={`overflow-x-auto rounded-lg ${darkMode ? 'shadow-none' : 'shadow'}`}>
       <table className={`min-w-full ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
@@ -579,17 +654,14 @@ function TableView({
                     >
                       Open
                     </button>
-                  ) : (
-                    <a 
-                      href={file.webContentLink || file.webViewLink} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      download={file.name}
+                  ) : allowDownload ? (
+                    <button
+                      onClick={() => handleDownload(file)}
                       className="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition-colors"
                     >
                       Download
-                    </a>
-                  )}
+                    </button>
+                  ) : null}
                   
                   {file.mimeType === 'application/pdf' ? (
                     <button

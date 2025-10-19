@@ -17,18 +17,36 @@ export const getBackendUrl = (): string => {
   return cleanBackendUrl;
 };
 
+// Fetch with timeout
+const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout: number = 15000): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+};
+
 export const getAuthUrl = async (): Promise<string> => {
   const backendUrl = getBackendUrl();
   const url = `${backendUrl}/api/auth/url`; // Add leading slash here
   console.log('Making request to:', url);
   
   try {
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
-    });
+    }, 10000); // 10 second timeout
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -55,7 +73,11 @@ export const fetchFiles = async (endpoint: string, folderId: string, token?: str
     headers['Authorization'] = `Bearer ${token}`;
   }
   
-  const response = await fetch(url, { headers });
+  const response = await fetchWithTimeout(url, { 
+    headers,
+    // Cache for 5 minutes
+    cache: 'force-cache'
+  }, 12000); // 12 second timeout
   
   if (!response.ok) {
     const data = await response.json();
@@ -76,7 +98,7 @@ export const fetchFolderPath = async (endpoint: string, folderId: string, token?
     headers['Authorization'] = `Bearer ${token}`;
   }
   
-  const response = await fetch(url, { headers });
+  const response = await fetchWithTimeout(url, { headers }, 10000); // 10 second timeout
   
   if (!response.ok) {
     const data = await response.json();
@@ -90,12 +112,14 @@ export const fetchEmbedFiles = async (folderId: string, apiKey: string) => {
   const backendUrl = getBackendUrl();
   const url = `${backendUrl}/api/embed/folder/${folderId}`;
   
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     headers: {
       'Content-Type': 'application/json',
       'X-API-Key': apiKey
-    }
-  });
+    },
+    // Cache for 3 minutes for embed
+    cache: 'force-cache'
+  }, 15000); // 15 second timeout for embed
   
   if (!response.ok) {
     const data = await response.json();
@@ -110,7 +134,7 @@ export const fetchPdf = async (fileId: string, token: string) => {
   // Use the public PDF endpoint to avoid 401 errors
   const url = `${backendUrl}/api/public/drive/pdf/${fileId}`;
   
-  const response = await fetch(url);
+  const response = await fetchWithTimeout(url, {}, 20000); // 20 second timeout for PDF
   
   if (!response.ok) {
     const data = await response.json();
