@@ -23,27 +23,39 @@ async function getFiles(req, res) {
     
     console.log('Token present:', !!token);
     
+    // Set a timeout for the operation (8 seconds - more aggressive)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Operation timed out')), 8000);
+    });
+    
     let files;
     if (token) {
       // Use private access with user authentication
       console.log('Using private access with token');
       try {
-        files = await driveService.getFilesFromFolderPrivate(token, folderId, search);
+        const privateFilesPromise = driveService.getFilesFromFolderPrivate(token, folderId, search);
+        files = await Promise.race([privateFilesPromise, timeoutPromise]);
       } catch (privateError) {
         console.error('Error with private access, falling back to public access:', privateError);
         // If private access fails, fall back to public access
-        files = await driveService.getFilesFromFolderPublic(folderId, search);
+        const publicFilesPromise = driveService.getFilesFromFolderPublic(folderId, search);
+        files = await Promise.race([publicFilesPromise, timeoutPromise]);
       }
     } else {
       // Use public access
       console.log('Using public access');
-      files = await driveService.getFilesFromFolderPublic(folderId, search);
+      const publicFilesPromise = driveService.getFilesFromFolderPublic(folderId, search);
+      files = await Promise.race([publicFilesPromise, timeoutPromise]);
     }
     
     console.log('Files found:', files ? files.length : 0);
     res.json(files);
   } catch (error) {
     console.error('Error in getFiles controller:', error);
+    // Check if it's a timeout error
+    if (error.message === 'Operation timed out') {
+      return res.status(504).json({ error: 'Request timed out. Google Drive is taking too long to respond. Please try again.' });
+    }
     // Check if it's an authentication error
     if (error.code === 401 || error.code === 403) {
       return res.status(403).json({ error: 'Access denied. Invalid or missing credentials.' });
@@ -71,24 +83,36 @@ async function getFile(req, res) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
     
+    // Set a timeout for the operation (5 seconds - more aggressive)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Operation timed out')), 5000);
+    });
+    
     let file;
     if (token) {
       // Use private access with user authentication
       try {
-        file = await driveService.getFileDetailsPrivate(token, fileId);
+        const privateFilePromise = driveService.getFileDetailsPrivate(token, fileId);
+        file = await Promise.race([privateFilePromise, timeoutPromise]);
       } catch (privateError) {
         console.error('Error with private access, falling back to public access:', privateError);
         // If private access fails, fall back to public access
-        file = await driveService.getFileDetailsPublic(fileId);
+        const publicFilePromise = driveService.getFileDetailsPublic(fileId);
+        file = await Promise.race([publicFilePromise, timeoutPromise]);
       }
     } else {
       // Use public access
-      file = await driveService.getFileDetailsPublic(fileId);
+      const publicFilePromise = driveService.getFileDetailsPublic(fileId);
+      file = await Promise.race([publicFilePromise, timeoutPromise]);
     }
     
     res.json(file);
   } catch (error) {
     console.error('Error in getFile controller:', error);
+    // Check if it's a timeout error
+    if (error.message === 'Operation timed out') {
+      return res.status(504).json({ error: 'Request timed out. Google Drive is taking too long to respond. Please try again.' });
+    }
     // Check if it's an authentication error
     if (error.code === 401 || error.code === 403) {
       return res.status(403).json({ error: 'Access denied. Invalid or missing credentials.' });
@@ -116,24 +140,36 @@ async function getFolderPath(req, res) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
     
+    // Set a timeout for the operation (6 seconds)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Operation timed out')), 6000);
+    });
+    
     let path;
     if (token) {
       // Use private access with user authentication
       try {
-        path = await driveService.getFolderPath(token, folderId);
+        const privatePathPromise = driveService.getFolderPath(token, folderId);
+        path = await Promise.race([privatePathPromise, timeoutPromise]);
       } catch (privateError) {
         console.error('Error with private access, falling back to public access:', privateError);
         // If private access fails, fall back to public access
-        path = await driveService.getFolderPath(null, folderId);
+        const publicPathPromise = driveService.getFolderPath(null, folderId);
+        path = await Promise.race([publicPathPromise, timeoutPromise]);
       }
     } else {
       // Use public access
-      path = await driveService.getFolderPath(null, folderId);
+      const publicPathPromise = driveService.getFolderPath(null, folderId);
+      path = await Promise.race([publicPathPromise, timeoutPromise]);
     }
     
     res.json(path);
   } catch (error) {
     console.error('Error in getFolderPath controller:', error);
+    // Check if it's a timeout error
+    if (error.message === 'Operation timed out') {
+      return res.status(504).json({ error: 'Request timed out. Google Drive is taking too long to respond. Please try again.' });
+    }
     // Check if it's an authentication error
     if (error.code === 401 || error.code === 403) {
       return res.status(403).json({ error: 'Access denied. Invalid or missing credentials.' });
