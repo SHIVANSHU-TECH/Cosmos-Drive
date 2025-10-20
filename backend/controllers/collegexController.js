@@ -24,7 +24,18 @@ async function createApiKey(req, res) {
     });
   } catch (error) {
     console.error('Error in createApiKey controller:', error);
-    res.status(500).json({ error: 'Failed to create API key: ' + error.message });
+    // More detailed error handling
+    if (error.name === 'FirebaseError') {
+      res.status(500).json({ 
+        error: 'Failed to create API key due to database error',
+        message: 'The system is currently unable to store user data. Please try again later.'
+      });
+    } else {
+      res.status(500).json({ 
+        error: 'Failed to create API key',
+        message: error.message || 'An unexpected error occurred'
+      });
+    }
   }
 }
 
@@ -92,9 +103,9 @@ async function getFolderFiles(req, res) {
       });
     }
     
-    // Set an extremely aggressive timeout for the operation (3 seconds)
+    // Set a reasonable timeout for the operation (8 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Operation timed out')), 3000);
+      setTimeout(() => reject(new Error('Operation timed out')), 8000);
     });
     
     // Validate API key with timeout
@@ -113,7 +124,7 @@ async function getFolderFiles(req, res) {
       return res.status(400).json({ error: 'Folder ID is required' });
     }
     
-    // Get only the first 25 files to ensure fast response (extremely aggressive)
+    // Get files with reasonable limits
     let filesResult;
     // If user has Google tokens, use private access, otherwise fall back to public
     if (user.hasGoogleTokens()) {
@@ -131,15 +142,15 @@ async function getFolderFiles(req, res) {
       filesResult = await driveService.getFilesFromFolderPublic(folderId);
     }
     
-    // Limit to first 25 files to ensure fast response
-    const limitedFiles = filesResult.files ? filesResult.files.slice(0, 25) : [];
-    console.log('Files found (limited to 25):', limitedFiles.length);
+    // Limit to first 50 files for performance
+    const limitedFiles = filesResult.files ? filesResult.files.slice(0, 50) : [];
+    console.log('Files found (limited to 50):', limitedFiles.length);
     
     // Return files with additional metadata
     res.json({
       folderId,
       files: limitedFiles,
-      nextPageToken: null, // Disable pagination for speed
+      nextPageToken: filesResult.nextPageToken,
       user: {
         id: user.id,
         email: user.email
@@ -182,9 +193,9 @@ async function getFolderForEmbed(req, res) {
       });
     }
     
-    // Set an extremely aggressive timeout for the operation (2.5 seconds)
+    // Set a reasonable timeout for the operation (10 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Operation timed out')), 2500);
+      setTimeout(() => reject(new Error('Operation timed out')), 10000);
     });
     
     // Validate API key with timeout
@@ -203,12 +214,12 @@ async function getFolderForEmbed(req, res) {
       return res.status(400).json({ error: 'Folder ID is required' });
     }
     
-    // Set an extremely aggressive timeout for the file fetching operation (2 seconds)
+    // Set a reasonable timeout for the file fetching operation (8 seconds)
     const fileFetchTimeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('File fetching timed out')), 2000);
+      setTimeout(() => reject(new Error('File fetching timed out')), 8000);
     });
     
-    // Get only the first 20 files to ensure fast response (extremely aggressive)
+    // Get files with reasonable limits
     let filesResult;
     // If user has Google tokens, use private access, otherwise fall back to public
     if (user.hasGoogleTokens()) {
@@ -229,15 +240,15 @@ async function getFolderForEmbed(req, res) {
       filesResult = await Promise.race([publicFilesPromise, fileFetchTimeoutPromise]);
     }
     
-    // Limit to first 20 files to ensure fast response
-    const limitedFiles = filesResult.files ? filesResult.files.slice(0, 20) : [];
-    console.log('Files found (limited to 20):', limitedFiles.length);
+    // Limit to first 50 files for performance
+    const limitedFiles = filesResult.files ? filesResult.files.slice(0, 50) : [];
+    console.log('Files found (limited to 50):', limitedFiles.length);
     
     // Return files with additional metadata for embedding
     res.json({
       folderId,
       files: limitedFiles,
-      nextPageToken: null, // Disable pagination for speed
+      nextPageToken: filesResult.nextPageToken,
       user: {
         id: user.id,
         email: user.email
@@ -279,9 +290,9 @@ async function getFileForEmbed(req, res) {
       });
     }
     
-    // Set an extremely aggressive timeout for the operation (1.5 seconds)
+    // Set a reasonable timeout for the operation (5 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Operation timed out')), 1500);
+      setTimeout(() => reject(new Error('Operation timed out')), 5000);
     });
     
     // Validate API key with timeout

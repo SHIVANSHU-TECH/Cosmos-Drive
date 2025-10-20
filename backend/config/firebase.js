@@ -24,19 +24,27 @@ try {
     admin = null;
     db = null;
   } else {
-    // Initialize Firebase Admin SDK with the correct database URL
-    if (!admin.apps.length) {
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        databaseURL: `https://${process.env.FIREBASE_PROJECT_ID}-default-rtdb.firebaseio.com`
-      });
-    }
+    try {
+      // Initialize Firebase Admin SDK with the correct database URL
+      if (!admin.apps.length) {
+        admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount),
+          databaseURL: `https://${process.env.FIREBASE_PROJECT_ID}-default-rtdb.firebaseio.com`
+        });
+      }
 
-    db = admin.database(); // Use Realtime Database instead of Firestore
+      db = admin.database(); // Use Realtime Database instead of Firestore
+      console.log('Firebase initialized successfully');
+    } catch (initError) {
+      console.warn('Firebase initialization failed:', initError.message);
+      console.warn('Firebase features will be disabled.');
+      admin = null;
+      db = null;
+    }
   }
 } catch (error) {
-  console.warn('Firebase initialization failed:', error.message);
-  console.warn('Firebase features will be disabled.');
+  console.warn('Firebase module not found or initialization failed:', error.message);
+  console.warn('Firebase features will be disabled. Install firebase-admin if you want to use Firebase.');
   admin = null;
   db = null;
 }
