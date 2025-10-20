@@ -21,9 +21,9 @@ const publicDrive = google.drive({
   auth: API_KEY
 });
 
-// Simple in-memory cache for file metadata (3 minutes cache to be more aggressive)
+// Simple in-memory cache for file metadata (2 minutes cache - more aggressive)
 const fileCache = new Map();
-const CACHE_DURATION = 3 * 60 * 1000; // 3 minutes
+const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
 
 // Add a timeout function for Google Drive operations
 const withTimeout = (promise, ms) => {
@@ -145,19 +145,22 @@ function getAuthenticatedDrive(accessToken) {
 }
 
 /**
- * Fetch files from a specific folder (public access)
+ * Fetch files from a specific folder (public access) with pagination
  * @param {string} folderId - The ID of the Google Drive folder
  * @param {string} searchTerm - Optional search term to filter files
- * @returns {Promise<Array>} - Array of file objects
+ * @param {string} pageToken - Optional page token for pagination
+ * @returns {Promise<Object>} - Object containing files and nextPageToken
  */
-async function getFilesFromFolderPublic(folderId, searchTerm = '') {
+async function getFilesFromFolderPublic(folderId, searchTerm = '', pageToken = null) {
   try {
-    // Check cache first
-    const cacheKey = `public_${folderId}_${searchTerm}`;
-    const cachedData = getCachedData(cacheKey);
-    if (cachedData) {
-      console.log('Returning cached data for folder:', folderId);
-      return cachedData;
+    // Check cache first for the first page
+    if (!pageToken) {
+      const cacheKey = `public_${folderId}_${searchTerm}`;
+      const cachedData = getCachedData(cacheKey);
+      if (cachedData) {
+        console.log('Returning cached data for folder:', folderId);
+        return cachedData;
+      }
     }
     
     let query = `'${folderId}' in parents and trashed = false`;
@@ -167,20 +170,27 @@ async function getFilesFromFolderPublic(folderId, searchTerm = '') {
       query += ` and name contains '${searchTerm}'`;
     }
     
-    // Add timeout to Google Drive operation (5 seconds - more aggressive)
+    // Add timeout to Google Drive operation (3 seconds - very aggressive)
     const response = await withTimeout(publicDrive.files.list({
       q: query,
-      fields: 'files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, owners(displayName, emailAddress), permissions, parents)',
+      fields: 'nextPageToken, files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, owners(displayName, emailAddress))',
       orderBy: 'name',
-      pageSize: 100 // Limit results to improve performance
-    }), 5000);
+      pageSize: 50, // Limit to 50 files per page (more aggressive)
+      pageToken: pageToken || undefined
+    }), 3000);
     
-    const files = response.data.files || [];
+    const result = {
+      files: response.data.files || [],
+      nextPageToken: response.data.nextPageToken
+    };
     
-    // Cache the results
-    setCachedData(cacheKey, files);
+    // Cache only the first page
+    if (!pageToken) {
+      const cacheKey = `public_${folderId}_${searchTerm}`;
+      setCachedData(cacheKey, result);
+    }
     
-    return files;
+    return result;
   } catch (error) {
     console.error('Error fetching files from folder (public):', error);
     
@@ -200,20 +210,23 @@ async function getFilesFromFolderPublic(folderId, searchTerm = '') {
 }
 
 /**
- * Fetch files from a specific folder (private access with user authentication)
+ * Fetch files from a specific folder (private access with user authentication) with pagination
  * @param {string} accessToken - User's OAuth access token
  * @param {string} folderId - The ID of the Google Drive folder
  * @param {string} searchTerm - Optional search term to filter files
- * @returns {Promise<Array>} - Array of file objects
+ * @param {string} pageToken - Optional page token for pagination
+ * @returns {Promise<Object>} - Object containing files and nextPageToken
  */
-async function getFilesFromFolderPrivate(accessToken, folderId, searchTerm = '') {
+async function getFilesFromFolderPrivate(accessToken, folderId, searchTerm = '', pageToken = null) {
   try {
-    // Check cache first
-    const cacheKey = `private_${folderId}_${accessToken.substring(0, 10)}_${searchTerm}`;
-    const cachedData = getCachedData(cacheKey);
-    if (cachedData) {
-      console.log('Returning cached data for private folder:', folderId);
-      return cachedData;
+    // Check cache first for the first page
+    if (!pageToken) {
+      const cacheKey = `private_${folderId}_${accessToken.substring(0, 10)}_${searchTerm}`;
+      const cachedData = getCachedData(cacheKey);
+      if (cachedData) {
+        console.log('Returning cached data for private folder:', folderId);
+        return cachedData;
+      }
     }
     
     const drive = getAuthenticatedDrive(accessToken);
@@ -225,20 +238,27 @@ async function getFilesFromFolderPrivate(accessToken, folderId, searchTerm = '')
       query += ` and name contains '${searchTerm}'`;
     }
     
-    // Add timeout to Google Drive operation (5 seconds - more aggressive)
+    // Add timeout to Google Drive operation (3 seconds - very aggressive)
     const response = await withTimeout(drive.files.list({
       q: query,
-      fields: 'files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, owners(displayName, emailAddress), permissions, parents)',
+      fields: 'nextPageToken, files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, owners(displayName, emailAddress))',
       orderBy: 'name',
-      pageSize: 100 // Limit results to improve performance
-    }), 5000);
+      pageSize: 50, // Limit to 50 files per page (more aggressive)
+      pageToken: pageToken || undefined
+    }), 3000);
     
-    const files = response.data.files || [];
+    const result = {
+      files: response.data.files || [],
+      nextPageToken: response.data.nextPageToken
+    };
     
-    // Cache the results
-    setCachedData(cacheKey, files);
+    // Cache only the first page
+    if (!pageToken) {
+      const cacheKey = `private_${folderId}_${accessToken.substring(0, 10)}_${searchTerm}`;
+      setCachedData(cacheKey, result);
+    }
     
-    return files;
+    return result;
   } catch (error) {
     console.error('Error fetching files from folder (private):', error);
     
@@ -265,11 +285,11 @@ async function getFileDetailsPublic(fileId) {
       return cachedData;
     }
     
-    // Add timeout to Google Drive operation (3 seconds)
+    // Add timeout to Google Drive operation (2 seconds - very aggressive)
     const response = await withTimeout(publicDrive.files.get({
       fileId: fileId,
       fields: 'id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, owners(displayName, emailAddress)'
-    }), 3000);
+    }), 2000);
     
     const file = response.data;
     
@@ -312,11 +332,11 @@ async function getFileDetailsPrivate(accessToken, fileId) {
     
     const drive = getAuthenticatedDrive(accessToken);
     
-    // Add timeout to Google Drive operation (3 seconds)
+    // Add timeout to Google Drive operation (2 seconds - very aggressive)
     const response = await withTimeout(drive.files.get({
       fileId: fileId,
       fields: 'id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, owners(displayName, emailAddress)'
-    }), 3000);
+    }), 2000);
     
     const file = response.data;
     
@@ -355,7 +375,7 @@ async function getFolderPath(accessToken, folderId) {
     
     // Limit the depth to prevent infinite loops
     let depth = 0;
-    const maxDepth = 10;
+    const maxDepth = 5; // Reduced from 10 to 5
     
     while (currentId && depth < maxDepth) {
       // Check cache first
@@ -368,12 +388,12 @@ async function getFolderPath(accessToken, folderId) {
         continue;
       }
       
-      // Add timeout to Google Drive operation (2 seconds per request)
+      // Add timeout to Google Drive operation (1.5 seconds per request - very aggressive)
       const response = await withTimeout(drive.files.get({
         fileId: currentId,
         fields: 'id, name, parents',
         supportsAllDrives: true
-      }), 2000);
+      }), 1500);
       
       const folder = response.data;
       

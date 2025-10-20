@@ -92,9 +92,9 @@ async function getFolderFiles(req, res) {
       });
     }
     
-    // Set a timeout for the operation (10 seconds - more aggressive)
+    // Set a very aggressive timeout for the operation (5 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Operation timed out')), 10000);
+      setTimeout(() => reject(new Error('Operation timed out')), 5000);
     });
     
     // Validate API key
@@ -113,29 +113,31 @@ async function getFolderFiles(req, res) {
       return res.status(400).json({ error: 'Folder ID is required' });
     }
     
-    let files;
+    // Get only the first page of files (most important change)
+    let filesResult;
     // If user has Google tokens, use private access, otherwise fall back to public
     if (user.hasGoogleTokens()) {
       console.log('Using private access with user tokens');
       try {
-        files = await driveService.getFilesFromFolderPrivate(user.googleAccessToken, folderId);
+        filesResult = await driveService.getFilesFromFolderPrivate(user.googleAccessToken, folderId);
       } catch (error) {
         console.error('Error fetching files with private access:', error);
         // If private access fails, fall back to public access
         console.log('Falling back to public access');
-        files = await driveService.getFilesFromFolderPublic(folderId);
+        filesResult = await driveService.getFilesFromFolderPublic(folderId);
       }
     } else {
       console.log('Using public access (user has no Google tokens)');
-      files = await driveService.getFilesFromFolderPublic(folderId);
+      filesResult = await driveService.getFilesFromFolderPublic(folderId);
     }
     
-    console.log('Files found:', files ? files.length : 0);
+    console.log('Files found:', filesResult.files ? filesResult.files.length : 0);
     
     // Return files with additional metadata
     res.json({
       folderId,
-      files: files || [],
+      files: filesResult.files || [],
+      nextPageToken: filesResult.nextPageToken,
       user: {
         id: user.id,
         email: user.email
@@ -178,9 +180,9 @@ async function getFolderForEmbed(req, res) {
       });
     }
     
-    // Set a more aggressive timeout for the operation (8 seconds)
+    // Set a very aggressive timeout for the operation (4 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Operation timed out')), 8000);
+      setTimeout(() => reject(new Error('Operation timed out')), 4000);
     });
     
     // Validate API key
@@ -199,37 +201,39 @@ async function getFolderForEmbed(req, res) {
       return res.status(400).json({ error: 'Folder ID is required' });
     }
     
-    // Set a more aggressive timeout for the file fetching operation (6 seconds)
+    // Set a very aggressive timeout for the file fetching operation (3 seconds)
     const fileFetchTimeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('File fetching timed out')), 6000);
+      setTimeout(() => reject(new Error('File fetching timed out')), 3000);
     });
     
-    let files;
+    // Get only the first page of files (most important change)
+    let filesResult;
     // If user has Google tokens, use private access, otherwise fall back to public
     if (user.hasGoogleTokens()) {
       console.log('Using private access with user tokens');
       try {
         const privateFilesPromise = driveService.getFilesFromFolderPrivate(user.googleAccessToken, folderId);
-        files = await Promise.race([privateFilesPromise, fileFetchTimeoutPromise]);
+        filesResult = await Promise.race([privateFilesPromise, fileFetchTimeoutPromise]);
       } catch (error) {
         console.error('Error fetching files with private access:', error);
         // If private access fails, fall back to public access
         console.log('Falling back to public access');
         const publicFilesPromise = driveService.getFilesFromFolderPublic(folderId);
-        files = await Promise.race([publicFilesPromise, fileFetchTimeoutPromise]);
+        filesResult = await Promise.race([publicFilesPromise, fileFetchTimeoutPromise]);
       }
     } else {
       console.log('Using public access (user has no Google tokens)');
       const publicFilesPromise = driveService.getFilesFromFolderPublic(folderId);
-      files = await Promise.race([publicFilesPromise, fileFetchTimeoutPromise]);
+      filesResult = await Promise.race([publicFilesPromise, fileFetchTimeoutPromise]);
     }
     
-    console.log('Files found:', files ? files.length : 0);
+    console.log('Files found:', filesResult.files ? filesResult.files.length : 0);
     
     // Return files with additional metadata for embedding
     res.json({
       folderId,
-      files: files || [],
+      files: filesResult.files || [],
+      nextPageToken: filesResult.nextPageToken,
       user: {
         id: user.id,
         email: user.email
@@ -271,9 +275,9 @@ async function getFileForEmbed(req, res) {
       });
     }
     
-    // Set a timeout for the operation (5 seconds - more aggressive)
+    // Set a timeout for the operation (2 seconds - very aggressive)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Operation timed out')), 5000);
+      setTimeout(() => reject(new Error('Operation timed out')), 2000);
     });
     
     // Validate API key

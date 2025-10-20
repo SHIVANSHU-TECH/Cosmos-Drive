@@ -8,10 +8,11 @@ const driveService = require('../services/driveService');
 async function getFiles(req, res) {
   try {
     const { folderId } = req.params;
-    const { search } = req.query; // Get search term from query parameters
+    const { search, pageToken } = req.query; // Get search term and page token from query parameters
     
     console.log('Received request for folder ID:', folderId);
     console.log('Search term:', search);
+    console.log('Page token:', pageToken);
     
     if (!folderId) {
       return res.status(400).json({ error: 'Folder ID is required' });
@@ -23,33 +24,33 @@ async function getFiles(req, res) {
     
     console.log('Token present:', !!token);
     
-    // Set a timeout for the operation (8 seconds - more aggressive)
+    // Set a very aggressive timeout for the operation (4 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Operation timed out')), 8000);
+      setTimeout(() => reject(new Error('Operation timed out')), 4000);
     });
     
-    let files;
+    let filesResult;
     if (token) {
       // Use private access with user authentication
       console.log('Using private access with token');
       try {
-        const privateFilesPromise = driveService.getFilesFromFolderPrivate(token, folderId, search);
-        files = await Promise.race([privateFilesPromise, timeoutPromise]);
+        const privateFilesPromise = driveService.getFilesFromFolderPrivate(token, folderId, search, pageToken);
+        filesResult = await Promise.race([privateFilesPromise, timeoutPromise]);
       } catch (privateError) {
         console.error('Error with private access, falling back to public access:', privateError);
         // If private access fails, fall back to public access
-        const publicFilesPromise = driveService.getFilesFromFolderPublic(folderId, search);
-        files = await Promise.race([publicFilesPromise, timeoutPromise]);
+        const publicFilesPromise = driveService.getFilesFromFolderPublic(folderId, search, pageToken);
+        filesResult = await Promise.race([publicFilesPromise, timeoutPromise]);
       }
     } else {
       // Use public access
       console.log('Using public access');
-      const publicFilesPromise = driveService.getFilesFromFolderPublic(folderId, search);
-      files = await Promise.race([publicFilesPromise, timeoutPromise]);
+      const publicFilesPromise = driveService.getFilesFromFolderPublic(folderId, search, pageToken);
+      filesResult = await Promise.race([publicFilesPromise, timeoutPromise]);
     }
     
-    console.log('Files found:', files ? files.length : 0);
-    res.json(files);
+    console.log('Files found:', filesResult.files ? filesResult.files.length : 0);
+    res.json(filesResult);
   } catch (error) {
     console.error('Error in getFiles controller:', error);
     // Check if it's a timeout error
@@ -83,9 +84,9 @@ async function getFile(req, res) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
     
-    // Set a timeout for the operation (5 seconds - more aggressive)
+    // Set a timeout for the operation (2 seconds - very aggressive)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Operation timed out')), 5000);
+      setTimeout(() => reject(new Error('Operation timed out')), 2000);
     });
     
     let file;
@@ -140,9 +141,9 @@ async function getFolderPath(req, res) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
     
-    // Set a timeout for the operation (6 seconds)
+    // Set a timeout for the operation (3 seconds - very aggressive)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Operation timed out')), 6000);
+      setTimeout(() => reject(new Error('Operation timed out')), 3000);
     });
     
     let path;
