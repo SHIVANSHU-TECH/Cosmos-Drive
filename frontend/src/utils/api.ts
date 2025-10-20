@@ -17,36 +17,57 @@ export const getBackendUrl = (): string => {
   return cleanBackendUrl;
 };
 
-// Fetch with timeout
-const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout: number = 15000): Promise<Response> => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
+// Fetch with timeout and retry logic
+const fetchWithTimeoutAndRetry = async (url: string, options: RequestInit = {}, timeout: number = 8000, retries: number = 2): Promise<Response> => {
+  for (let i = 0; i <= retries; i++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      // If it's a 504 (timeout) and we have retries left, try again
+      if (response.status === 504 && i < retries) {
+        console.log(`Attempt ${i + 1} failed with 504, retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Backoff
+        continue;
+      }
+      
+      return response;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      
+      // If it's an abort error (timeout) and we have retries left, try again
+      if (error.name === 'AbortError' && i < retries) {
+        console.log(`Attempt ${i + 1} timed out, retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Backoff
+        continue;
+      }
+      
+      throw error;
+    }
   }
+  
+  throw new Error('All retry attempts failed');
 };
 
 export const getAuthUrl = async (): Promise<string> => {
   const backendUrl = getBackendUrl();
-  const url = `${backendUrl}/api/auth/url`; // Add leading slash here
+  const url = `${backendUrl}/api/auth/url`;
   console.log('Making request to:', url);
   
   try {
-    const response = await fetchWithTimeout(url, {
+    const response = await fetchWithTimeoutAndRetry(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
-    }, 10000); // 10 second timeout
+    }, 5000, 1); // 5 second timeout, 1 retry
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -73,11 +94,11 @@ export const fetchFiles = async (endpoint: string, folderId: string, token?: str
     headers['Authorization'] = `Bearer ${token}`;
   }
   
-  const response = await fetchWithTimeout(url, { 
+  const response = await fetchWithTimeoutAndRetry(url, { 
     headers,
-    // Cache for 5 minutes
+    // Cache for 3 minutes
     cache: 'force-cache'
-  }, 12000); // 12 second timeout
+  }, 8000, 1); // 8 second timeout, 1 retry
   
   if (!response.ok) {
     const data = await response.json();
@@ -98,7 +119,11 @@ export const fetchFolderPath = async (endpoint: string, folderId: string, token?
     headers['Authorization'] = `Bearer ${token}`;
   }
   
-  const response = await fetchWithTimeout(url, { headers }, 10000); // 10 second timeout
+  const response = await fetchWithTimeoutAndRetry(url, { 
+    headers,
+    // Cache for 5 minutes
+    cache: 'force-cache'
+  }, 6000, 1); // 6 second timeout, 1 retry
   
   if (!response.ok) {
     const data = await response.json();
@@ -112,14 +137,14 @@ export const fetchEmbedFiles = async (folderId: string, apiKey: string) => {
   const backendUrl = getBackendUrl();
   const url = `${backendUrl}/api/embed/folder/${folderId}`;
   
-  const response = await fetchWithTimeout(url, {
+  const response = await fetchWithTimeoutAndRetry(url, {
     headers: {
       'Content-Type': 'application/json',
       'X-API-Key': apiKey
     },
-    // Cache for 3 minutes for embed
+    // Cache for 2 minutes for embed
     cache: 'force-cache'
-  }, 15000); // 15 second timeout for embed
+  }, 10000, 1); // 10 second timeout, 1 retry for embed
   
   if (!response.ok) {
     const data = await response.json();
@@ -134,7 +159,7 @@ export const fetchPdf = async (fileId: string, token: string) => {
   // Use the public PDF endpoint to avoid 401 errors
   const url = `${backendUrl}/api/public/drive/pdf/${fileId}`;
   
-  const response = await fetchWithTimeout(url, {}, 20000); // 20 second timeout for PDF
+  const response = await fetchWithTimeoutAndRetry(url, {}, 15000, 1); // 15 second timeout, 1 retry for PDF
   
   if (!response.ok) {
     const data = await response.json();
