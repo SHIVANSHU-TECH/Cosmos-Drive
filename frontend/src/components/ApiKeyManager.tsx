@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
+import { createApiKey as createApiKeyUtil } from '@/utils/api'; // Import the utility function
 
 export default function ApiKeyManager() {
   const [email, setEmail] = useState('');
@@ -22,24 +23,13 @@ export default function ApiKeyManager() {
     setSuccess(false);
 
     try {
-      const response = await fetch('/api/api-keys', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setApiKey(data.apiKey);
-        setSuccess(true);
-      } else {
-        setError(data.error || 'Failed to create API key');
-      }
-    } catch (err) {
-      setError('Network error. Please try again.');
+      // Use the utility function which correctly calls the backend endpoint
+      const data = await createApiKeyUtil(email);
+      
+      setApiKey(data.apiKey);
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.message || 'Network error. Please try again.');
     } finally {
       setLoading(false);
     }
