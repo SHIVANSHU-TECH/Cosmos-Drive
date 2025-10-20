@@ -92,12 +92,12 @@ async function getFolderFiles(req, res) {
       });
     }
     
-    // Set a very aggressive timeout for the operation (5 seconds)
+    // Set an extremely aggressive timeout for the operation (3 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Operation timed out')), 5000);
+      setTimeout(() => reject(new Error('Operation timed out')), 3000);
     });
     
-    // Validate API key
+    // Validate API key with timeout
     const userPromise = ApiKeyService.getUserByApiKey(apiKey);
     const user = await Promise.race([userPromise, timeoutPromise]);
     
@@ -113,7 +113,7 @@ async function getFolderFiles(req, res) {
       return res.status(400).json({ error: 'Folder ID is required' });
     }
     
-    // Get only the first page of files (most important change)
+    // Get only the first 25 files to ensure fast response (extremely aggressive)
     let filesResult;
     // If user has Google tokens, use private access, otherwise fall back to public
     if (user.hasGoogleTokens()) {
@@ -131,13 +131,15 @@ async function getFolderFiles(req, res) {
       filesResult = await driveService.getFilesFromFolderPublic(folderId);
     }
     
-    console.log('Files found:', filesResult.files ? filesResult.files.length : 0);
+    // Limit to first 25 files to ensure fast response
+    const limitedFiles = filesResult.files ? filesResult.files.slice(0, 25) : [];
+    console.log('Files found (limited to 25):', limitedFiles.length);
     
     // Return files with additional metadata
     res.json({
       folderId,
-      files: filesResult.files || [],
-      nextPageToken: filesResult.nextPageToken,
+      files: limitedFiles,
+      nextPageToken: null, // Disable pagination for speed
       user: {
         id: user.id,
         email: user.email
@@ -146,7 +148,7 @@ async function getFolderFiles(req, res) {
   } catch (error) {
     console.error('Error in getFolderFiles controller:', error);
     if (error.message === 'Operation timed out') {
-      res.status(504).json({ error: 'Request timed out. Google Drive is taking too long to respond. Please try again.' });
+      res.status(504).json({ error: 'Request timed out. Please try again.' });
     } else {
       // Check if it's an authentication error
       if (error.code === 401 || error.code === 403) {
@@ -180,12 +182,12 @@ async function getFolderForEmbed(req, res) {
       });
     }
     
-    // Set a very aggressive timeout for the operation (4 seconds)
+    // Set an extremely aggressive timeout for the operation (2.5 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Operation timed out')), 4000);
+      setTimeout(() => reject(new Error('Operation timed out')), 2500);
     });
     
-    // Validate API key
+    // Validate API key with timeout
     const userPromise = ApiKeyService.getUserByApiKey(apiKey);
     const user = await Promise.race([userPromise, timeoutPromise]);
     
@@ -201,12 +203,12 @@ async function getFolderForEmbed(req, res) {
       return res.status(400).json({ error: 'Folder ID is required' });
     }
     
-    // Set a very aggressive timeout for the file fetching operation (3 seconds)
+    // Set an extremely aggressive timeout for the file fetching operation (2 seconds)
     const fileFetchTimeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('File fetching timed out')), 3000);
+      setTimeout(() => reject(new Error('File fetching timed out')), 2000);
     });
     
-    // Get only the first page of files (most important change)
+    // Get only the first 20 files to ensure fast response (extremely aggressive)
     let filesResult;
     // If user has Google tokens, use private access, otherwise fall back to public
     if (user.hasGoogleTokens()) {
@@ -227,13 +229,15 @@ async function getFolderForEmbed(req, res) {
       filesResult = await Promise.race([publicFilesPromise, fileFetchTimeoutPromise]);
     }
     
-    console.log('Files found:', filesResult.files ? filesResult.files.length : 0);
+    // Limit to first 20 files to ensure fast response
+    const limitedFiles = filesResult.files ? filesResult.files.slice(0, 20) : [];
+    console.log('Files found (limited to 20):', limitedFiles.length);
     
     // Return files with additional metadata for embedding
     res.json({
       folderId,
-      files: filesResult.files || [],
-      nextPageToken: filesResult.nextPageToken,
+      files: limitedFiles,
+      nextPageToken: null, // Disable pagination for speed
       user: {
         id: user.id,
         email: user.email
@@ -242,7 +246,7 @@ async function getFolderForEmbed(req, res) {
   } catch (error) {
     console.error('Error in getFolderForEmbed controller:', error);
     if (error.message === 'Operation timed out' || error.message === 'File fetching timed out') {
-      res.status(504).json({ error: 'Request timed out. Google Drive is taking too long to respond. Please try again.' });
+      res.status(504).json({ error: 'Request timed out. Please try again.' });
     } else {
       // Check if it's an authentication error
       if (error.code === 401 || error.code === 403) {
@@ -275,12 +279,12 @@ async function getFileForEmbed(req, res) {
       });
     }
     
-    // Set a timeout for the operation (2 seconds - very aggressive)
+    // Set an extremely aggressive timeout for the operation (1.5 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Operation timed out')), 2000);
+      setTimeout(() => reject(new Error('Operation timed out')), 1500);
     });
     
-    // Validate API key
+    // Validate API key with timeout
     const userPromise = ApiKeyService.getUserByApiKey(apiKey);
     const user = await Promise.race([userPromise, timeoutPromise]);
     
@@ -313,7 +317,7 @@ async function getFileForEmbed(req, res) {
   } catch (error) {
     console.error('Error in getFileForEmbed controller:', error);
     if (error.message === 'Operation timed out') {
-      res.status(504).json({ error: 'Request timed out. Google Drive is taking too long to respond. Please try again.' });
+      res.status(504).json({ error: 'Request timed out. Please try again.' });
     } else {
       // Check if it's an authentication error
       if (error.code === 401 || error.code === 403) {
