@@ -34,8 +34,6 @@ function EmbedPageContent() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [darkMode, setDarkMode] = useState(false);
-  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
-  const [hasMoreFiles, setHasMoreFiles] = useState(false);
   const searchParams = useSearchParams();
   const { token, isAuthenticated } = useAuth();
 
@@ -94,11 +92,7 @@ function EmbedPageContent() {
       
       // Fetch files from our API using the correct endpoint
       const data = await fetchEmbedFiles(currentFolderId, apiKey);
-      
-      // For embed, we only show the first page to avoid timeouts
       setFiles(data.files || []);
-      setNextPageToken(data.nextPageToken || null);
-      setHasMoreFiles(!!data.nextPageToken);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -379,14 +373,6 @@ function EmbedPageContent() {
               allowDownload={allowDownload} 
               darkMode={darkMode}
             />
-          )}
-          
-          {/* Show message if there are more files but we're only showing first page */}
-          {hasMoreFiles && (
-            <div className={`p-4 text-center ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
-              <p>This folder contains more files. For performance reasons, only the first 50 files are displayed.</p>
-              <p className="text-sm mt-1">Use search to find specific files.</p>
-            </div>
           )}
         </div>
       </div>

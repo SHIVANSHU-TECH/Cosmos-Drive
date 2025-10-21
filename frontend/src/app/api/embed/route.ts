@@ -57,7 +57,7 @@ export async function GET(request: Request) {
     return NextResponse.json(result);
   } catch (error) {
     console.error('Error proxying embed request:', error);
-    if (error.name === 'AbortError') {
+    if (error instanceof Error && error.name === 'AbortError') {
       return NextResponse.json(
         { error: 'Request timed out. Please try again.' },
         { status: 504 }
