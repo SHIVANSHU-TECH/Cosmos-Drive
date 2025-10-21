@@ -21,9 +21,9 @@ const publicDrive = google.drive({
   auth: API_KEY
 });
 
-// Simple in-memory cache for file metadata (1 minute cache - extremely aggressive)
+// Simple in-memory cache for file metadata (5 minutes cache)
 const fileCache = new Map();
-const CACHE_DURATION = 1 * 60 * 1000; // 1 minute
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // Add a timeout function for Google Drive operations
 const withTimeout = (promise, ms) => {
@@ -145,22 +145,19 @@ function getAuthenticatedDrive(accessToken) {
 }
 
 /**
- * Fetch files from a specific folder (public access) with aggressive limits
+ * Fetch files from a specific folder (public access)
  * @param {string} folderId - The ID of the Google Drive folder
  * @param {string} searchTerm - Optional search term to filter files
- * @param {string} pageToken - Optional page token for pagination
- * @returns {Promise<Object>} - Object containing files and nextPageToken
+ * @returns {Promise<Array>} - Array of file objects
  */
-async function getFilesFromFolderPublic(folderId, searchTerm = '', pageToken = null) {
+async function getFilesFromFolderPublic(folderId, searchTerm = '') {
   try {
-    // Check cache first for the first page
-    if (!pageToken) {
-      const cacheKey = `public_${folderId}_${searchTerm}`;
-      const cachedData = getCachedData(cacheKey);
-      if (cachedData) {
-        console.log('Returning cached data for folder:', folderId);
-        return cachedData;
-      }
+    // Check cache first
+    const cacheKey = `public_${folderId}_${searchTerm}`;
+    const cachedData = getCachedData(cacheKey);
+    if (cachedData) {
+      console.log('Returning cached data for folder:', folderId);
+      return cachedData;
     }
     
     let query = `'${folderId}' in parents and trashed = false`;
@@ -170,27 +167,19 @@ async function getFilesFromFolderPublic(folderId, searchTerm = '', pageToken = n
       query += ` and name contains '${searchTerm}'`;
     }
     
-    // Add timeout to Google Drive operation (1.5 seconds - extremely aggressive)
+    // Add timeout to Google Drive operation (8 seconds for better performance)
     const response = await withTimeout(publicDrive.files.list({
       q: query,
-      fields: 'nextPageToken, files(id, name, mimeType, size, modifiedTime, webContentLink)',
-      orderBy: 'name',
-      pageSize: 25, // Limit to 25 files (extremely aggressive)
-      pageToken: pageToken || undefined
-    }), 1500);
+      fields: 'files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, owners(displayName, emailAddress), permissions, parents)',
+      orderBy: 'name'
+    }), 8000);
     
-    const result = {
-      files: response.data.files || [],
-      nextPageToken: response.data.nextPageToken
-    };
+    const files = response.data.files || [];
     
-    // Cache only the first page
-    if (!pageToken) {
-      const cacheKey = `public_${folderId}_${searchTerm}`;
-      setCachedData(cacheKey, result);
-    }
+    // Cache the results
+    setCachedData(cacheKey, files);
     
-    return result;
+    return files;
   } catch (error) {
     console.error('Error fetching files from folder (public):', error);
     
@@ -201,8 +190,6 @@ async function getFilesFromFolderPublic(folderId, searchTerm = '', pageToken = n
       throw new Error('Access denied to folder. The folder may not be publicly shared or the API key may not have sufficient permissions.');
     } else if (error.code === 401) {
       throw new Error('Invalid API key. Please check your API key configuration.');
-    } else if (error.message === 'Operation timed out') {
-      throw new Error('Request timed out. Please try again.');
     }
     
     throw error;
@@ -210,23 +197,20 @@ async function getFilesFromFolderPublic(folderId, searchTerm = '', pageToken = n
 }
 
 /**
- * Fetch files from a specific folder (private access with user authentication) with aggressive limits
+ * Fetch files from a specific folder (private access with user authentication)
  * @param {string} accessToken - User's OAuth access token
  * @param {string} folderId - The ID of the Google Drive folder
  * @param {string} searchTerm - Optional search term to filter files
- * @param {string} pageToken - Optional page token for pagination
- * @returns {Promise<Object>} - Object containing files and nextPageToken
+ * @returns {Promise<Array>} - Array of file objects
  */
-async function getFilesFromFolderPrivate(accessToken, folderId, searchTerm = '', pageToken = null) {
+async function getFilesFromFolderPrivate(accessToken, folderId, searchTerm = '') {
   try {
-    // Check cache first for the first page
-    if (!pageToken) {
-      const cacheKey = `private_${folderId}_${accessToken.substring(0, 10)}_${searchTerm}`;
-      const cachedData = getCachedData(cacheKey);
-      if (cachedData) {
-        console.log('Returning cached data for private folder:', folderId);
-        return cachedData;
-      }
+    // Check cache first
+    const cacheKey = `private_${folderId}_${accessToken.substring(0, 10)}_${searchTerm}`;
+    const cachedData = getCachedData(cacheKey);
+    if (cachedData) {
+      console.log('Returning cached data for private folder:', folderId);
+      return cachedData;
     }
     
     const drive = getAuthenticatedDrive(accessToken);
@@ -238,34 +222,21 @@ async function getFilesFromFolderPrivate(accessToken, folderId, searchTerm = '',
       query += ` and name contains '${searchTerm}'`;
     }
     
-    // Add timeout to Google Drive operation (1.5 seconds - extremely aggressive)
+    // Add timeout to Google Drive operation (8 seconds for better performance)
     const response = await withTimeout(drive.files.list({
       q: query,
-      fields: 'nextPageToken, files(id, name, mimeType, size, modifiedTime, webContentLink)',
-      orderBy: 'name',
-      pageSize: 25, // Limit to 25 files (extremely aggressive)
-      pageToken: pageToken || undefined
-    }), 1500);
+      fields: 'files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, owners(displayName, emailAddress), permissions, parents)',
+      orderBy: 'name'
+    }), 8000);
     
-    const result = {
-      files: response.data.files || [],
-      nextPageToken: response.data.nextPageToken
-    };
+    const files = response.data.files || [];
     
-    // Cache only the first page
-    if (!pageToken) {
-      const cacheKey = `private_${folderId}_${accessToken.substring(0, 10)}_${searchTerm}`;
-      setCachedData(cacheKey, result);
-    }
+    // Cache the results
+    setCachedData(cacheKey, files);
     
-    return result;
+    return files;
   } catch (error) {
     console.error('Error fetching files from folder (private):', error);
-    
-    if (error.message === 'Operation timed out') {
-      throw new Error('Request timed out. Please try again.');
-    }
-    
     throw error;
   }
 }
@@ -277,39 +248,15 @@ async function getFilesFromFolderPrivate(accessToken, folderId, searchTerm = '',
  */
 async function getFileDetailsPublic(fileId) {
   try {
-    // Check cache first
-    const cacheKey = `file_public_${fileId}`;
-    const cachedData = getCachedData(cacheKey);
-    if (cachedData) {
-      console.log('Returning cached data for file:', fileId);
-      return cachedData;
-    }
-    
-    // Add timeout to Google Drive operation (1 second - extremely aggressive)
+    // Add timeout to Google Drive operation (10 seconds)
     const response = await withTimeout(publicDrive.files.get({
       fileId: fileId,
-      fields: 'id, name, mimeType, size, modifiedTime, webContentLink'
-    }), 1000);
+      fields: 'id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, parents, owners(displayName, emailAddress), permissions'
+    }), 10000);
     
-    const file = response.data;
-    
-    // Cache the results
-    setCachedData(cacheKey, file);
-    
-    return file;
+    return response.data;
   } catch (error) {
     console.error('Error fetching file details (public):', error);
-    
-    if (error.code === 404) {
-      throw new Error('File not found. Please check the file ID and ensure it is publicly accessible.');
-    } else if (error.code === 403) {
-      throw new Error('Access denied to file. The file may not be publicly shared or the API key may not have sufficient permissions.');
-    } else if (error.code === 401) {
-      throw new Error('Invalid API key. Please check your API key configuration.');
-    } else if (error.message === 'Operation timed out') {
-      throw new Error('Request timed out. Please try again.');
-    }
-    
     throw error;
   }
 }
@@ -322,113 +269,107 @@ async function getFileDetailsPublic(fileId) {
  */
 async function getFileDetailsPrivate(accessToken, fileId) {
   try {
-    // Check cache first
-    const cacheKey = `file_private_${fileId}_${accessToken.substring(0, 10)}`;
-    const cachedData = getCachedData(cacheKey);
-    if (cachedData) {
-      console.log('Returning cached data for private file:', fileId);
-      return cachedData;
-    }
-    
     const drive = getAuthenticatedDrive(accessToken);
     
-    // Add timeout to Google Drive operation (1 second - extremely aggressive)
+    // Add timeout to Google Drive operation (10 seconds)
     const response = await withTimeout(drive.files.get({
       fileId: fileId,
-      fields: 'id, name, mimeType, size, modifiedTime, webContentLink'
-    }), 1000);
+      fields: 'id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, parents, owners(displayName, emailAddress), permissions'
+    }), 10000);
     
-    const file = response.data;
-    
-    // Cache the results
-    setCachedData(cacheKey, file);
-    
-    return file;
+    return response.data;
   } catch (error) {
     console.error('Error fetching file details (private):', error);
+    throw error;
+  }
+}
+
+/**
+ * Get folder path (breadcrumb trail) - works for both public and private
+ * @param {string} accessToken - User's OAuth access token (optional for public access)
+ * @param {string} folderId - The ID of the Google Drive folder
+ * @returns {Promise<Array>} - Array of folder objects representing the path
+ */
+async function getFolderPath(accessToken, folderId) {
+  try {
+    // Use authenticated client if access token is provided, otherwise use public client
+    const drive = accessToken ? getAuthenticatedDrive(accessToken) : publicDrive;
     
-    if (error.message === 'Operation timed out') {
-      throw new Error('Request timed out. Please try again.');
+    const path = [];
+    let currentId = folderId;
+    
+    // Keep going up the hierarchy until we reach the root or a limit
+    while (currentId && path.length < 10) { // Limit to prevent infinite loops
+      // Add timeout to Google Drive operation (5 seconds)
+      const response = await withTimeout(drive.files.get({
+        fileId: currentId,
+        fields: 'id, name, parents'
+      }), 5000);
+      
+      const folder = response.data;
+      path.unshift({
+        id: folder.id,
+        name: folder.name
+      });
+      
+      // Move to parent
+      currentId = folder.parents && folder.parents.length > 0 ? folder.parents[0] : null;
+      
+      // Break if we've reached the root
+      if (!currentId) break;
+    }
+    
+    return path;
+  } catch (error) {
+    console.error('Error fetching folder path:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get public PDF content
+ * @param {string} fileId - The ID of the Google Drive PDF file
+ * @returns {Promise<Buffer>} - PDF content as buffer
+ */
+async function getPublicPdfContent(fileId) {
+  try {
+    // Add timeout to Google Drive operation (15 seconds)
+    const response = await withTimeout(publicDrive.files.get(
+      {
+        fileId: fileId,
+        alt: 'media'
+      },
+      {
+        responseType: 'stream'
+      }
+    ), 15000);
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching public PDF content:', error);
+    
+    // Provide more specific error messages
+    if (error.code === 404) {
+      throw new Error('PDF file not found. Please check the file ID and ensure it is publicly accessible.');
+    } else if (error.code === 403) {
+      throw new Error('Access denied to PDF file. The file may not be publicly shared or the API key may not have sufficient permissions.');
+    } else if (error.code === 401) {
+      throw new Error('Invalid API key. Please check your API key configuration.');
+    } else if (error.code === 400) {
+      throw new Error('Invalid file type. Only PDF files can be previewed.');
     }
     
     throw error;
   }
 }
 
-/**
- * Get folder path/breadcrumb trail
- * @param {string|null} accessToken - User's OAuth access token (null for public access)
- * @param {string} folderId - The ID of the Google Drive folder
- * @returns {Promise<Array>} - Array of folder objects representing the path
- */
-async function getFolderPath(accessToken, folderId) {
-  try {
-    let drive;
-    if (accessToken) {
-      drive = getAuthenticatedDrive(accessToken);
-    } else {
-      drive = publicDrive;
-    }
-    
-    const path = [];
-    let currentId = folderId;
-    
-    // Limit the depth to prevent infinite loops (extremely aggressive - only 3 levels)
-    let depth = 0;
-    const maxDepth = 3;
-    
-    while (currentId && depth < maxDepth) {
-      // Check cache first
-      const cacheKey = `path_${currentId}_${accessToken ? 'private' : 'public'}`;
-      const cachedData = getCachedData(cacheKey);
-      if (cachedData) {
-        path.unshift(cachedData);
-        currentId = cachedData.parents ? cachedData.parents[0] : null;
-        depth++;
-        continue;
-      }
-      
-      // Add timeout to Google Drive operation (0.8 seconds per request - extremely aggressive)
-      const response = await withTimeout(drive.files.get({
-        fileId: currentId,
-        fields: 'id, name, parents',
-        supportsAllDrives: true
-      }), 800);
-      
-      const folder = response.data;
-      
-      // Cache the results
-      setCachedData(cacheKey, folder);
-      
-      path.unshift({
-        id: folder.id,
-        name: folder.name
-      });
-      
-      // Move to parent folder
-      currentId = folder.parents ? folder.parents[0] : null;
-      depth++;
-    }
-    
-    return path;
-  } catch (error) {
-    console.error('Error fetching folder path:', error);
-    
-    if (error.message === 'Operation timed out') {
-      throw new Error('Request timed out. Please try again.');
-    }
-    
-    // Return what we have so far if there's an error
-    return [];
-  }
-}
-
 module.exports = {
-  generateAuthUrl,
-  getOAuthTokens,
   getFilesFromFolderPublic,
   getFilesFromFolderPrivate,
   getFileDetailsPublic,
   getFileDetailsPrivate,
-  getFolderPath
+  getFolderPath,
+  generateAuthUrl,
+  getOAuthTokens,
+  getPublicPdfContent
 };

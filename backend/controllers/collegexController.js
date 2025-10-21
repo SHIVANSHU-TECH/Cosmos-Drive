@@ -14,8 +14,16 @@ async function createApiKey(req, res) {
       return res.status(400).json({ error: 'Email is required' });
     }
     
+    // Set a longer timeout for the entire operation (30 seconds) to account for retries
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('API key creation timed out')), 30000);
+    });
+    
     // Create a new user with API key
-    const user = await ApiKeyService.createUser(email);
+    const userPromise = ApiKeyService.createUser(email);
+    
+    // Race between the operation and timeout
+    const user = await Promise.race([userPromise, timeoutPromise]);
     
     res.status(201).json({
       apiKey: user.apiKey,
@@ -24,17 +32,10 @@ async function createApiKey(req, res) {
     });
   } catch (error) {
     console.error('Error in createApiKey controller:', error);
-    // More detailed error handling
-    if (error.name === 'FirebaseError') {
-      res.status(500).json({ 
-        error: 'Failed to create API key due to database error',
-        message: 'The system is currently unable to store user data. Please try again later.'
-      });
+    if (error.message === 'API key creation timed out') {
+      res.status(504).json({ error: 'API key creation timed out. Please try again.' });
     } else {
-      res.status(500).json({ 
-        error: 'Failed to create API key',
-        message: error.message || 'An unexpected error occurred'
-      });
+      res.status(500).json({ error: 'Failed to create API key: ' + error.message });
     }
   }
 }
@@ -61,8 +62,16 @@ async function addGoogleTokens(req, res) {
       });
     }
     
+    // Set a timeout for the operation (10 seconds)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Operation timed out')), 10000);
+    });
+    
     // Add tokens to user
-    const user = await ApiKeyService.addGoogleTokensToUser(apiKey, accessToken, refreshToken);
+    const userPromise = ApiKeyService.addGoogleTokensToUser(apiKey, accessToken, refreshToken);
+    
+    // Race between the operation and timeout
+    const user = await Promise.race([userPromise, timeoutPromise]);
     
     if (!user) {
       return res.status(404).json({ 
@@ -79,7 +88,11 @@ async function addGoogleTokens(req, res) {
     });
   } catch (error) {
     console.error('Error in addGoogleTokens controller:', error);
-    res.status(500).json({ error: 'Failed to add Google tokens: ' + error.message });
+    if (error.message === 'Operation timed out') {
+      res.status(504).json({ error: 'Operation timed out. Please try again.' });
+    } else {
+      res.status(500).json({ error: 'Failed to add Google tokens: ' + error.message });
+    }
   }
 }
 
@@ -103,12 +116,12 @@ async function getFolderFiles(req, res) {
       });
     }
     
-    // Set a reasonable timeout for the operation (8 seconds)
+    // Set a timeout for the operation (15 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Operation timed out')), 8000);
+      setTimeout(() => reject(new Error('Operation timed out')), 15000);
     });
     
-    // Validate API key with timeout
+    // Validate API key
     const userPromise = ApiKeyService.getUserByApiKey(apiKey);
     const user = await Promise.race([userPromise, timeoutPromise]);
     
@@ -124,33 +137,29 @@ async function getFolderFiles(req, res) {
       return res.status(400).json({ error: 'Folder ID is required' });
     }
     
-    // Get files with reasonable limits
-    let filesResult;
+    let files;
     // If user has Google tokens, use private access, otherwise fall back to public
     if (user.hasGoogleTokens()) {
       console.log('Using private access with user tokens');
       try {
-        filesResult = await driveService.getFilesFromFolderPrivate(user.googleAccessToken, folderId);
+        files = await driveService.getFilesFromFolderPrivate(user.googleAccessToken, folderId);
       } catch (error) {
         console.error('Error fetching files with private access:', error);
         // If private access fails, fall back to public access
         console.log('Falling back to public access');
-        filesResult = await driveService.getFilesFromFolderPublic(folderId);
+        files = await driveService.getFilesFromFolderPublic(folderId);
       }
     } else {
       console.log('Using public access (user has no Google tokens)');
-      filesResult = await driveService.getFilesFromFolderPublic(folderId);
+      files = await driveService.getFilesFromFolderPublic(folderId);
     }
     
-    // Limit to first 50 files for performance
-    const limitedFiles = filesResult.files ? filesResult.files.slice(0, 50) : [];
-    console.log('Files found (limited to 50):', limitedFiles.length);
+    console.log('Files found:', files ? files.length : 0);
     
     // Return files with additional metadata
     res.json({
       folderId,
-      files: limitedFiles,
-      nextPageToken: filesResult.nextPageToken,
+      files: files || [],
       user: {
         id: user.id,
         email: user.email
@@ -159,7 +168,7 @@ async function getFolderFiles(req, res) {
   } catch (error) {
     console.error('Error in getFolderFiles controller:', error);
     if (error.message === 'Operation timed out') {
-      res.status(504).json({ error: 'Request timed out. Please try again.' });
+      res.status(504).json({ error: 'Operation timed out. Please try again.' });
     } else {
       // Check if it's an authentication error
       if (error.code === 401 || error.code === 403) {
@@ -193,12 +202,12 @@ async function getFolderForEmbed(req, res) {
       });
     }
     
-    // Set a reasonable timeout for the operation (10 seconds)
+    // Set a reasonable timeout for the operation (15 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Operation timed out')), 10000);
+      setTimeout(() => reject(new Error('Operation timed out')), 15000);
     });
     
-    // Validate API key with timeout
+    // Validate API key
     const userPromise = ApiKeyService.getUserByApiKey(apiKey);
     const user = await Promise.race([userPromise, timeoutPromise]);
     
@@ -214,41 +223,37 @@ async function getFolderForEmbed(req, res) {
       return res.status(400).json({ error: 'Folder ID is required' });
     }
     
-    // Set a reasonable timeout for the file fetching operation (8 seconds)
+    // Set a timeout for the file fetching operation (12 seconds)
     const fileFetchTimeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('File fetching timed out')), 8000);
+      setTimeout(() => reject(new Error('File fetching timed out')), 12000);
     });
     
-    // Get files with reasonable limits
-    let filesResult;
+    let files;
     // If user has Google tokens, use private access, otherwise fall back to public
     if (user.hasGoogleTokens()) {
       console.log('Using private access with user tokens');
       try {
         const privateFilesPromise = driveService.getFilesFromFolderPrivate(user.googleAccessToken, folderId);
-        filesResult = await Promise.race([privateFilesPromise, fileFetchTimeoutPromise]);
+        files = await Promise.race([privateFilesPromise, fileFetchTimeoutPromise]);
       } catch (error) {
         console.error('Error fetching files with private access:', error);
         // If private access fails, fall back to public access
         console.log('Falling back to public access');
         const publicFilesPromise = driveService.getFilesFromFolderPublic(folderId);
-        filesResult = await Promise.race([publicFilesPromise, fileFetchTimeoutPromise]);
+        files = await Promise.race([publicFilesPromise, fileFetchTimeoutPromise]);
       }
     } else {
       console.log('Using public access (user has no Google tokens)');
       const publicFilesPromise = driveService.getFilesFromFolderPublic(folderId);
-      filesResult = await Promise.race([publicFilesPromise, fileFetchTimeoutPromise]);
+      files = await Promise.race([publicFilesPromise, fileFetchTimeoutPromise]);
     }
     
-    // Limit to first 50 files for performance
-    const limitedFiles = filesResult.files ? filesResult.files.slice(0, 50) : [];
-    console.log('Files found (limited to 50):', limitedFiles.length);
+    console.log('Files found:', files ? files.length : 0);
     
     // Return files with additional metadata for embedding
     res.json({
       folderId,
-      files: limitedFiles,
-      nextPageToken: filesResult.nextPageToken,
+      files: files || [],
       user: {
         id: user.id,
         email: user.email
@@ -257,7 +262,7 @@ async function getFolderForEmbed(req, res) {
   } catch (error) {
     console.error('Error in getFolderForEmbed controller:', error);
     if (error.message === 'Operation timed out' || error.message === 'File fetching timed out') {
-      res.status(504).json({ error: 'Request timed out. Please try again.' });
+      res.status(504).json({ error: 'Operation timed out. Please try again.' });
     } else {
       // Check if it's an authentication error
       if (error.code === 401 || error.code === 403) {
@@ -290,12 +295,12 @@ async function getFileForEmbed(req, res) {
       });
     }
     
-    // Set a reasonable timeout for the operation (5 seconds)
+    // Set a timeout for the operation (10 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Operation timed out')), 5000);
+      setTimeout(() => reject(new Error('Operation timed out')), 10000);
     });
     
-    // Validate API key with timeout
+    // Validate API key
     const userPromise = ApiKeyService.getUserByApiKey(apiKey);
     const user = await Promise.race([userPromise, timeoutPromise]);
     
@@ -328,7 +333,7 @@ async function getFileForEmbed(req, res) {
   } catch (error) {
     console.error('Error in getFileForEmbed controller:', error);
     if (error.message === 'Operation timed out') {
-      res.status(504).json({ error: 'Request timed out. Please try again.' });
+      res.status(504).json({ error: 'Operation timed out. Please try again.' });
     } else {
       // Check if it's an authentication error
       if (error.code === 401 || error.code === 403) {

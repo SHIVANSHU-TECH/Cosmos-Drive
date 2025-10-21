@@ -5,14 +5,12 @@ const crypto = require('crypto');
 let firebaseModule;
 try {
   firebaseModule = require('../config/firebase');
-  console.log('Firebase module loaded successfully');
 } catch (error) {
-  console.warn('Firebase config module not available:', error.message);
+  console.warn('Firebase module not available, using in-memory storage');
   firebaseModule = { db: null, admin: null };
 }
 
-// Check if firebaseModule has the expected properties
-const { db, admin } = firebaseModule && typeof firebaseModule === 'object' ? firebaseModule : { db: null, admin: null };
+const { db, admin } = firebaseModule;
 
 // Fallback to in-memory storage if Firebase is not configured
 let users = new Map();
@@ -30,7 +28,7 @@ class ApiKeyService {
     const user = new User(userId, email, apiKey);
     
     // If Firebase is configured, save to Realtime Database
-    if (db && admin) {
+    if (db) {
       try {
         console.log(`Attempting to sync user to Firebase: ${email}`);
         await db.ref('users/' + apiKey).set({
@@ -58,15 +56,10 @@ class ApiKeyService {
 
   // Get user by API key
   static async getUserByApiKey(apiKey) {
-    // Handle case where apiKey might be null/undefined
-    if (!apiKey) {
-      return null;
-    }
-    
     // If Firebase is configured, get from Realtime Database
-    if (db && admin) {
+    if (db) {
       try {
-        console.log(`Attempting to retrieve user from Firebase: ${apiKey ? apiKey.substring(0, 8) : 'null'}...`);
+        console.log(`Attempting to retrieve user from Firebase: ${apiKey.substring(0, 8)}...`);
         const snapshot = await db.ref('users/' + apiKey).once('value');
         if (!snapshot.exists()) {
           console.log('User not found in Firebase');
@@ -114,13 +107,8 @@ class ApiKeyService {
 
   // Add Google tokens to user
   static async addGoogleTokensToUser(apiKey, accessToken, refreshToken) {
-    // Handle case where apiKey might be null/undefined
-    if (!apiKey) {
-      return null;
-    }
-    
     // If Firebase is configured, update in Realtime Database
-    if (db && admin) {
+    if (db) {
       try {
         console.log(`Attempting to update user tokens in Firebase: ${apiKey.substring(0, 8)}...`);
         const snapshot = await db.ref('users/' + apiKey).once('value');
@@ -174,7 +162,7 @@ class ApiKeyService {
   // Get all users (for admin purposes)
   static async getAllUsers() {
     // If Firebase is configured, get all from Realtime Database
-    if (db && admin) {
+    if (db) {
       try {
         console.log('Attempting to retrieve all users from Firebase');
         const snapshot = await db.ref('users').once('value');
@@ -212,13 +200,8 @@ class ApiKeyService {
 
   // Delete a user
   static async deleteUser(apiKey) {
-    // Handle case where apiKey might be null/undefined
-    if (!apiKey) {
-      return false;
-    }
-    
     // If Firebase is configured, delete from Realtime Database
-    if (db && admin) {
+    if (db) {
       try {
         console.log(`Attempting to delete user from Firebase: ${apiKey.substring(0, 8)}...`);
         await db.ref('users/' + apiKey).remove();
@@ -234,6 +217,23 @@ class ApiKeyService {
       console.log('Firebase not configured, deleting user from in-memory storage');
       return users.delete(apiKey);
     }
+  }
+  
+  // Get files for a user by API key
+  static async getFilesForUser(apiKey, folderId) {
+    const user = await this.getUserByApiKey(apiKey);
+    if (!user) {
+      throw new Error('Invalid API key');
+    }
+    
+    // Return user info and folder ID for the frontend to handle
+    return {
+      user: {
+        id: user.id,
+        email: user.email
+      },
+      folderId
+    };
   }
 }
 
