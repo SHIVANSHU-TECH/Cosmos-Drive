@@ -401,8 +401,8 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
           )}
           
           <div className="flex justify-center">
-            <div className="w-full md:w-11/12 lg:w-4/5 xl:w-3/5 2xl:w-1/2 max-w-[1100px] h-[85vh] flex items-start justify-center mx-auto">
-              <canvas ref={canvasRef} className="shadow-lg max-w-full max-h-full bg-white rounded-lg" />
+            <div className="w-full md:w-11/12 lg:w-4/5 xl:w-3/5 2xl:w-1/2 max-w-[1100px] h-[85vh] flex items-start justify-center mx-auto overflow-auto">
+              <canvas ref={canvasRef} className="shadow-lg bg-white rounded-lg" />
             </div>
           </div>
         </div>
