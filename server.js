@@ -1,5 +1,7 @@
 // Import required modules
 const express = require('express');
+const compression = require('compression');
+
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
@@ -77,6 +79,13 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json());
+// Enable gzip/deflate compression for faster responses
+app.use(compression());
+// Hint keep-alive (actual socket keep-alive is managed by Node/http server and proxy)
+app.use((req, res, next) => {
+  res.setHeader('Connection', 'keep-alive');
+  next();
+});
 
 // Add this middleware to handle preflight requests for all routes
 app.options('*', cors(corsOptions));
