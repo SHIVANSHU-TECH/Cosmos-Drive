@@ -263,7 +263,7 @@ function EmbedPageContent() {
         />
       )}
       
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-6xl">
         <div className={`rounded-lg shadow-md overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
           {/* Breadcrumb Navigation */}
           {folderPath.length > 1 && (

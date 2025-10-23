@@ -103,6 +103,13 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
     }
   }, [pageNumber]);
 
+  // Re-render when zoom scale changes (desktop only)
+  useEffect(() => {
+    if (pdfRef.current && !isMobile) {
+      renderPage(pageNumber);
+    }
+  }, [scale]);
+
   const loadPdf = async () => {
     try {
       setLoading(true);
@@ -177,7 +184,9 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
       const viewport = page.getViewport({ scale: 1 });
       const widthScale = (containerWidth * 0.98) / viewport.width;
       const heightScale = (containerHeight * 0.98) / viewport.height;
-      const finalScale = Math.min(widthScale, heightScale);
+      const fitScale = Math.min(widthScale, heightScale);
+      const userScale = isMobile ? 1 : scale; // apply zoom only on non-mobile
+      const finalScale = fitScale * userScale;
       console.log('Container WxH:', containerWidth, 'x', containerHeight, 'Viewport WxH:', viewport.width, 'x', viewport.height, 'Scale W/H:', widthScale, heightScale, 'Final:', finalScale);
       
       const scaledViewport = page.getViewport({ scale: finalScale });
@@ -278,7 +287,7 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
           </button>
         </div>
         
-        {/* Toolbar - responsive layout (zoom controls removed for simplicity and consistency) */}
+        {/* Toolbar - navigation and desktop zoom controls */}
         <div className={`flex flex-col sm:flex-row items-center justify-between p-3 sm:p-4 gap-3 ${darkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
           <div className="flex flex-wrap items-center gap-2">
             <button 
@@ -317,6 +326,29 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
               </svg>
             </button>
           </div>
+          {!isMobile && (
+            <div className="flex items-center gap-2">
+              <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Zoom:</span>
+              <button
+                onClick={() => setScale(1.0)}
+                className={`px-3 py-2 text-sm rounded-lg ${scale === 1.0 ? 'bg-blue-600 text-white' : (darkMode ? 'bg-gray-700 border border-gray-600 text-white hover:bg-gray-600' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50')}`}
+              >
+                100%
+              </button>
+              <button
+                onClick={() => setScale(1.25)}
+                className={`px-3 py-2 text-sm rounded-lg ${scale === 1.25 ? 'bg-blue-600 text-white' : (darkMode ? 'bg-gray-700 border border-gray-600 text-white hover:bg-gray-600' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50')}`}
+              >
+                125%
+              </button>
+              <button
+                onClick={() => setScale(1.5)}
+                className={`px-3 py-2 text-sm rounded-lg ${scale === 1.5 ? 'bg-blue-600 text-white' : (darkMode ? 'bg-gray-700 border border-gray-600 text-white hover:bg-gray-600' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50')}`}
+              >
+                150%
+              </button>
+            </div>
+          )}
         </div>
         
         {/* PDF Content */}
@@ -369,40 +401,6 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
             </div>
           </div>
         </div>
-        
-        {/* Mobile navigation buttons */}
-        {isMobile && (
-          <div className={`flex justify-between p-4 border-t ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
-            <button 
-              onClick={goToPrevPage}
-              disabled={pageNumber <= 1}
-              className={`px-4 py-2 rounded-lg disabled:opacity-50 transition-colors flex items-center ${
-                darkMode 
-                  ? 'bg-gray-700 border border-gray-600 text-white hover:bg-gray-600' 
-                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
-              </svg>
-              Prev
-            </button>
-            <button 
-              onClick={goToNextPage}
-              disabled={pageNumber >= numPages}
-              className={`px-4 py-2 rounded-lg disabled:opacity-50 transition-colors flex items-center ${
-                darkMode 
-                  ? 'bg-gray-700 border border-gray-600 text-white hover:bg-gray-600' 
-                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Next
-              <svg className="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
-              </svg>
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
