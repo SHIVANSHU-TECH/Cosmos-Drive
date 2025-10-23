@@ -363,6 +363,34 @@ async function getPublicPdfContent(fileId) {
   }
 }
 
+/**
+ * Get public PDF response (stream + headers), honoring optional Range header
+ * @param {string} fileId
+ * @param {string} [rangeHeader]
+ * @returns {Promise<Object>} - Axios-like response with data (stream) and headers
+ */
+async function getPublicPdfResponse(fileId, rangeHeader) {
+  try {
+    const response = await withTimeout(
+      publicDrive.files.get(
+        {
+          fileId: fileId,
+          alt: 'media'
+        },
+        {
+          responseType: 'stream',
+          headers: rangeHeader ? { Range: rangeHeader } : undefined
+        }
+      ),
+      15000
+    );
+    return response; // includes response.data (stream) and response.headers
+  } catch (error) {
+    console.error('Error fetching public PDF (response):', error);
+    throw error;
+  }
+}
+
 module.exports = {
   getFilesFromFolderPublic,
   getFilesFromFolderPrivate,
@@ -371,5 +399,6 @@ module.exports = {
   getFolderPath,
   generateAuthUrl,
   getOAuthTokens,
-  getPublicPdfContent
+  getPublicPdfContent,
+  getPublicPdfResponse
 };

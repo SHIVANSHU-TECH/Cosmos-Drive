@@ -144,6 +144,8 @@ async function getFolderPath(req, res) {
   }
 }
 
+// Move the module.exports block to the bottom of the file
+// for easier addition of new controller exports
 module.exports = {
   getFiles,
   getFile,
