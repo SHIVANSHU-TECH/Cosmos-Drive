@@ -169,13 +169,16 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
       
       const page = await pdfRef.current.getPage(pageNum);
       
-      // Calculate scale based on container width (fit-to-width)
+      // Calculate scale based on container width and height (fit-to-box)
       const canvas = canvasRef.current;
-      const containerWidth = canvas.parentElement?.clientWidth || window.innerWidth;
+      const parent = canvas.parentElement; // inner wrapper that controls width/height
+      const containerWidth = parent?.clientWidth || window.innerWidth;
+      const containerHeight = parent?.clientHeight || window.innerHeight * 0.85;
       const viewport = page.getViewport({ scale: 1 });
-      const scaleRatio = (containerWidth * 0.9) / viewport.width;
-      const finalScale = scaleRatio;
-      console.log('Container width:', containerWidth, 'Viewport width:', viewport.width, 'Scale ratio:', scaleRatio, 'Final scale:', finalScale);
+      const widthScale = (containerWidth * 0.98) / viewport.width;
+      const heightScale = (containerHeight * 0.98) / viewport.height;
+      const finalScale = Math.min(widthScale, heightScale);
+      console.log('Container WxH:', containerWidth, 'x', containerHeight, 'Viewport WxH:', viewport.width, 'x', viewport.height, 'Scale W/H:', widthScale, heightScale, 'Final:', finalScale);
       
       const scaledViewport = page.getViewport({ scale: finalScale });
       
@@ -361,7 +364,9 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
           )}
           
           <div className="flex justify-center">
-            <canvas ref={canvasRef} className="shadow-lg max-w-full bg-white rounded-lg" />
+            <div className="w-full md:w-11/12 lg:w-4/5 xl:w-3/5 2xl:w-1/2 max-w-[1100px] h-[85vh] flex items-start justify-center mx-auto">
+              <canvas ref={canvasRef} className="shadow-lg max-w-full max-h-full bg-white rounded-lg" />
+            </div>
           </div>
         </div>
         

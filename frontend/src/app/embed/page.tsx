@@ -253,7 +253,7 @@ function EmbedPageContent() {
   }
 
   return (
-    <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} p-4`}>
+    <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
       {/* PDF Viewer Modal */}
       {pdfPreview && (
         <PdfViewer 
@@ -319,8 +319,8 @@ function EmbedPageContent() {
             </div>
           </div>
           
-          {/* Search and View Controls */}
-          <div className={`flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} p-4 rounded-lg`}>
+          {/* Search and View Controls - match header/card background */}
+          <div className={`flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 ${darkMode ? 'bg-gray-800' : 'bg-white'} p-4 rounded-lg`}>
             <div className="w-full md:w-auto">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -522,14 +522,15 @@ function GridView({
   };
   
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
-      {files.map((file) => (
-        <div 
-          key={file.id} 
-          className={`border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow ${
-            darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'
-          }`}
-        >
+    <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} ${darkMode ? 'shadow-none' : 'shadow'}`}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {files.map((file) => (
+          <div 
+            key={file.id} 
+            className={`border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow ${
+              darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'
+            }`}
+          >
           <div className="flex items-center mb-3">
             {getFileIcon(file.mimeType)}
             <h3 className={`font-medium ml-2 truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>{file.name}</h3>
@@ -573,8 +574,9 @@ function GridView({
               Modified: {new Date(file.modifiedTime).toLocaleDateString()}
             </p>
           )}
-        </div>
-      ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -660,8 +662,9 @@ function TableView({
   };
   
   return (
-    <div className={`overflow-x-auto rounded-lg ${darkMode ? 'shadow-none' : 'shadow'}`}>
-      <table className={`min-w-full ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+    <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} ${darkMode ? 'shadow-none' : 'shadow'}`}>
+      <div className="overflow-x-auto rounded-lg">
+        <table className={`min-w-full ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
         <thead className={darkMode ? 'bg-gray-700' : 'bg-gray-50'}>
           <tr>
             <th className={`py-3 px-4 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Name</th>
@@ -737,7 +740,8 @@ function TableView({
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   );
 }
