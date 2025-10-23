@@ -3,14 +3,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
-import dynamic from 'next/dynamic';
 import { fetchEmbedFiles } from '@/utils/api';
+import PdfViewer from '@/components/PdfViewer';
 import { useAuth } from '@/components/AuthProvider';
-
-// Lazy-load the heavy PDF viewer to reduce initial JS in embeds
-const PdfViewer = dynamic(() => import('@/components/PdfViewer'), {
-  ssr: false,
-});
 
 interface DriveFile {
   id: string;
@@ -39,7 +34,6 @@ function EmbedPageContent() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [darkMode, setDarkMode] = useState(false);
-  const [quiet, setQuiet] = useState(false);
   const searchParams = useSearchParams();
   const { token, isAuthenticated } = useAuth();
 
@@ -48,41 +42,22 @@ function EmbedPageContent() {
     const apiKey = searchParams.get('key');
     const folderId = searchParams.get('folderid');
     const allowdl = searchParams.get('allowdl');
-    const disableDownload = searchParams.get('disableDownload');
-    const theme = searchParams.get('theme'); // 'dark' | 'light'
-    const defaultTab = searchParams.get('defaultTab'); // 'grid' | 'table'
-    const quietParam = searchParams.get('quiet'); // '1' | 'true'
     
     if (apiKey && folderId) {
-      // allowdl=no or disableDownload=1|true will disable downloads
-      const disable = (allowdl === 'no') || (disableDownload === '1' || disableDownload === 'true');
-      setAllowDownload(!disable);
+      setAllowDownload(allowdl !== 'no');
       setCurrentFolderId(folderId);
       setFolderPath([{id: folderId, name: 'Root'}]); // Initialize with root folder
     }
     
-    // Theme override via query param
-    if (theme === 'dark') {
-      setDarkMode(true);
-    } else if (theme === 'light') {
-      setDarkMode(false);
+    // Check for dark mode preference in localStorage or system preference
+    const savedDarkMode = localStorage.getItem('darkMode');
+    if (savedDarkMode !== null) {
+      setDarkMode(savedDarkMode === 'true');
     } else {
-      // Check for dark mode preference in localStorage or system preference
-      const savedDarkMode = localStorage.getItem('darkMode');
-      if (savedDarkMode !== null) {
-        setDarkMode(savedDarkMode === 'true');
-      } else {
-        const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        setDarkMode(systemPrefersDark);
-      }
+      // Check system preference
+      const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setDarkMode(systemPrefersDark);
     }
-
-    // defaultTab override
-    if (defaultTab === 'table') setViewMode('table');
-    if (defaultTab === 'grid') setViewMode('grid');
-
-    // quiet mode
-    if (quietParam === '1' || quietParam === 'true') setQuiet(true);
   }, [searchParams]);
 
   // Apply dark mode class to body
@@ -102,35 +77,6 @@ function EmbedPageContent() {
       fetchFiles();
     }
   }, [currentFolderId, searchTerm]);
-
-  // Inform parent (when embedded in an iframe) about height changes
-  useEffect(() => {
-    const sendHeight = () => {
-      try {
-        const height = document.documentElement.scrollHeight;
-        if (window.parent && window.parent !== window) {
-          window.parent.postMessage({ type: 'COSMOS_EMBED_RESIZE', height }, '*');
-        }
-      } catch {}
-    };
-
-    // Initial send and on resize
-    sendHeight();
-    const onResize = () => sendHeight();
-    window.addEventListener('resize', onResize);
-
-    // Observe DOM changes to adjust height
-    const observer = new MutationObserver(() => sendHeight());
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
-
-    const interval = setInterval(sendHeight, 1000);
-
-    return () => {
-      window.removeEventListener('resize', onResize);
-      observer.disconnect();
-      clearInterval(interval);
-    };
-  }, []);
 
   const fetchFiles = async () => {
     try {
@@ -231,21 +177,13 @@ function EmbedPageContent() {
             <div className={`mt-2 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
               <p>{error}</p>
             </div>
-            <div className="mt-4 flex gap-2 justify-center">
+            <div className="mt-4">
               <button
                 onClick={fetchFiles}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
               >
                 Retry
               </button>
-              <a
-                href={typeof window !== 'undefined' ? window.location.href : '#'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
-              >
-                Open in new tab
-              </a>
             </div>
           </div>
         </div>
@@ -759,19 +697,10 @@ function EmbedPageLoading() {
   }, []);
   
   return (
-    <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} p-4`}>
-      <div className={`max-w-md w-full rounded-lg shadow-md p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-        <div className="text-center">
-          <div className={`mx-auto flex items-center justify-center h-12 w-12 rounded-full ${darkMode ? 'bg-red-900' : 'bg-red-100'}`}>
-            <svg className="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <h3 className={`mt-4 text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Error</h3>
-          <div className={`mt-2 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
-            <p>Loading...</p>
-          </div>
-        </div>
+    <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+        <p className={`mt-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Loading files...</p>
       </div>
     </div>
   );
