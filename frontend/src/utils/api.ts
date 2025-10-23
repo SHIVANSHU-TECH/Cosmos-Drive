@@ -57,6 +57,12 @@ const fetchWithTimeoutAndRetry = async (url: string, options: RequestInit = {}, 
         continue;
       }
       
+      // Normalize abort error message for UI
+      if (error.name === 'AbortError') {
+        const err = new Error('Request timed out. Please try again.');
+        (err as any).name = 'AbortError';
+        throw err;
+      }
       throw error;
     }
   }
@@ -188,7 +194,7 @@ export const createApiKey = async (email: string) => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ email })
-  }, 15000, 2); // 15 second timeout, 2 retries for API key creation
+  }, 30000, 0); // 30 second timeout to match backend, no retries to avoid duplicate creations
   
   if (!response.ok) {
     const data = await response.json();
