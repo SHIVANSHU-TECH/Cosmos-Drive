@@ -39,6 +39,9 @@ function getCachedData(key) {
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
     return cached.data;
   }
+  fileCache.delete(key);
+  return null;
+}
 
 /**
  * Fetch files from a specific folder (private) with pagination
@@ -78,9 +81,6 @@ async function getFilesFromFolderPrivatePaged(accessToken, folderId, searchTerm 
     console.error('Error fetching files from folder (private, paged):', error);
     throw error;
   }
-}
-  fileCache.delete(key);
-  return null;
 }
 
 function setCachedData(key, data) {
