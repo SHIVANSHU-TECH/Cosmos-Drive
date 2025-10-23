@@ -224,12 +224,12 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
       
       const page = await pdfRef.current.getPage(pageNum);
       
-      // Calculate scale based on container width
+      // Calculate scale based on container width (fit-to-width)
       const canvas = canvasRef.current;
       const containerWidth = canvas.parentElement?.clientWidth || window.innerWidth;
       const viewport = page.getViewport({ scale: 1 });
       const scaleRatio = (containerWidth * 0.9) / viewport.width;
-      const finalScale = Math.min(scale, scaleRatio);
+      const finalScale = scaleRatio;
       console.log('Container width:', containerWidth, 'Viewport width:', viewport.width, 'Scale ratio:', scaleRatio, 'Final scale:', finalScale);
       
       const scaledViewport = page.getViewport({ scale: finalScale });
@@ -312,7 +312,7 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
           </button>
         </div>
         
-        {/* Toolbar - responsive layout */}
+        {/* Toolbar - responsive layout (zoom controls removed for simplicity and consistency) */}
         <div className={`flex flex-col sm:flex-row items-center justify-between p-3 sm:p-4 gap-3 ${darkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
           <div className="flex flex-wrap items-center gap-2">
             <button 
@@ -348,41 +348,6 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
               Next
               <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
-              </svg>
-            </button>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={zoomOut}
-              disabled={scale <= 0.2}
-              className={`px-3 py-2 text-sm rounded-lg disabled:opacity-50 transition-colors ${
-                darkMode 
-                  ? 'bg-gray-700 border border-gray-600 text-white hover:bg-gray-600' 
-                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 12H4"></path>
-              </svg>
-            </button>
-            <span className={`px-3 py-2 text-sm rounded-lg ${
-              darkMode 
-                ? 'bg-gray-700 border border-gray-600 text-white' 
-                : 'bg-white border border-gray-300 text-gray-700'
-            }`}>
-              {Math.round(scale * 100)}%
-            </span>
-            <button 
-              onClick={zoomIn}
-              className={`px-3 py-2 text-sm rounded-lg transition-colors ${
-                darkMode 
-                  ? 'bg-gray-700 border border-gray-600 text-white hover:bg-gray-600' 
-                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
               </svg>
             </button>
           </div>

@@ -4,16 +4,20 @@ export const getBackendUrl = (): string => {
   // In development, default to localhost:3001
   if (typeof window !== 'undefined') {
     // Client-side check
-    console.log('Client-side environment variables:', {
-      NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL,
-      NODE_ENV: process.env.NODE_ENV
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Client-side environment variables:', {
+        NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL,
+        NODE_ENV: process.env.NODE_ENV
+      });
+    }
   }
   
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
   // Remove trailing slash if present
   const cleanBackendUrl = backendUrl.endsWith('/') ? backendUrl.slice(0, -1) : backendUrl;
-  console.log('Using backend URL:', cleanBackendUrl);
+  if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+    console.log('Using backend URL:', cleanBackendUrl);
+  }
   return cleanBackendUrl;
 };
 
@@ -33,7 +37,9 @@ const fetchWithTimeoutAndRetry = async (url: string, options: RequestInit = {}, 
       
       // If it's a 504 (timeout) and we have retries left, try again
       if (response.status === 504 && i < retries) {
-        console.log(`Attempt ${i + 1} failed with 504, retrying...`);
+        if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+          console.log(`Attempt ${i + 1} failed with 504, retrying...`);
+        }
         await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second backoff
         continue;
       }
@@ -44,7 +50,9 @@ const fetchWithTimeoutAndRetry = async (url: string, options: RequestInit = {}, 
       
       // If it's an abort error (timeout) and we have retries left, try again
       if (error.name === 'AbortError' && i < retries) {
-        console.log(`Attempt ${i + 1} timed out, retrying...`);
+        if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+          console.log(`Attempt ${i + 1} timed out, retrying...`);
+        }
         await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second backoff
         continue;
       }
@@ -144,7 +152,7 @@ export const fetchEmbedFiles = async (folderId: string, apiKey: string) => {
     },
     // Cache for 2 minutes
     cache: 'force-cache'
-  }, 20000, 2); // 20 second timeout, 2 retries for embed
+  }, 10000, 0); // 10 second timeout, no retries for embed to avoid long waits
   
   if (!response.ok) {
     const data = await response.json();

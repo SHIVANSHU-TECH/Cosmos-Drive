@@ -40,6 +40,11 @@ const nextConfig: NextConfig = {
 
   // ✅ (Optional but good practice)
   reactStrictMode: true,
+
+  // ✅ Remove console.* in production bundles
+  compiler: {
+    removeConsole: true,
+  },
 };
 
 export default nextConfig;
