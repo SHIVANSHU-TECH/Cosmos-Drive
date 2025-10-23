@@ -223,37 +223,54 @@ async function getFolderForEmbed(req, res) {
       return res.status(400).json({ error: 'Folder ID is required' });
     }
     
+    // Pagination and filtering inputs
+    const pageSize = Math.min(parseInt(req.query.pageSize) || 24, 100);
+    const pageToken = req.query.pageToken || undefined;
+    const searchTerm = req.query.search || '';
+
     // Set a timeout for the file fetching operation (12 seconds)
     const fileFetchTimeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('File fetching timed out')), 12000);
     });
-    
-    let files;
+
+    let filesResult;
     // If user has Google tokens, use private access, otherwise fall back to public
     if (user.hasGoogleTokens()) {
       console.log('Using private access with user tokens');
       try {
-        const privateFilesPromise = driveService.getFilesFromFolderPrivate(user.googleAccessToken, folderId);
-        files = await Promise.race([privateFilesPromise, fileFetchTimeoutPromise]);
+        const privateFilesPromise = driveService.getFilesFromFolderPrivatePaged(user.googleAccessToken, folderId, searchTerm, pageSize, pageToken);
+        filesResult = await Promise.race([privateFilesPromise, fileFetchTimeoutPromise]);
       } catch (error) {
         console.error('Error fetching files with private access:', error);
         // If private access fails, fall back to public access
         console.log('Falling back to public access');
-        const publicFilesPromise = driveService.getFilesFromFolderPublic(folderId);
-        files = await Promise.race([publicFilesPromise, fileFetchTimeoutPromise]);
+        const publicFilesPromise = driveService.getFilesFromFolderPublicPaged(folderId, searchTerm, pageSize, pageToken);
+        filesResult = await Promise.race([publicFilesPromise, fileFetchTimeoutPromise]);
       }
     } else {
       console.log('Using public access (user has no Google tokens)');
-      const publicFilesPromise = driveService.getFilesFromFolderPublic(folderId);
-      files = await Promise.race([publicFilesPromise, fileFetchTimeoutPromise]);
+      const publicFilesPromise = driveService.getFilesFromFolderPublicPaged(folderId, searchTerm, pageSize, pageToken);
+      filesResult = await Promise.race([publicFilesPromise, fileFetchTimeoutPromise]);
     }
-    
-    console.log('Files found:', files ? files.length : 0);
-    
+
+    const files = filesResult?.files || [];
+    const nextPageToken = filesResult?.nextPageToken || null;
+    console.log('Files found:', files ? files.length : 0, 'nextPageToken:', nextPageToken);
+
+    // Short-lived caching headers
+    res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+    // Weak ETag based on folderId + count + nextPageToken
+    const etag = `W/"${folderId}:${files.length}:${nextPageToken || ''}"`;
+    res.set('ETag', etag);
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end();
+    }
+
     // Return files with additional metadata for embedding
     res.json({
       folderId,
-      files: files || [],
+      files,
+      nextPageToken,
       user: {
         id: user.id,
         email: user.email

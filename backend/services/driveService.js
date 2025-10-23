@@ -39,6 +39,46 @@ function getCachedData(key) {
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
     return cached.data;
   }
+
+/**
+ * Fetch files from a specific folder (private) with pagination
+ * @param {string} accessToken
+ * @param {string} folderId
+ * @param {string} searchTerm
+ * @param {number} pageSize
+ * @param {string|undefined} pageToken
+ * @returns {Promise<{files: any[], nextPageToken: string|null}>}
+ */
+async function getFilesFromFolderPrivatePaged(accessToken, folderId, searchTerm = '', pageSize = 24, pageToken = undefined) {
+  try {
+    const drive = getAuthenticatedDrive(accessToken);
+    const cacheKey = `private_paged_${folderId}_${accessToken.substring(0, 10)}_${searchTerm}_${pageSize}_${pageToken || 'first'}`;
+    const cached = getCachedData(cacheKey);
+    if (cached) return cached;
+
+    let query = `'${folderId}' in parents and trashed = false`;
+    if (searchTerm) {
+      query += ` and name contains '${searchTerm}'`;
+    }
+
+    const response = await withTimeout(drive.files.list({
+      q: query,
+      fields: 'nextPageToken, files(id, name, mimeType, size, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink)',
+      orderBy: 'name',
+      pageSize,
+      pageToken
+    }), 8000);
+
+    const files = response.data.files || [];
+    const nextPageToken = response.data.nextPageToken || null;
+    const result = { files, nextPageToken };
+    setCachedData(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error('Error fetching files from folder (private, paged):', error);
+    throw error;
+  }
+}
   fileCache.delete(key);
   return null;
 }
@@ -192,6 +232,44 @@ async function getFilesFromFolderPublic(folderId, searchTerm = '') {
       throw new Error('Invalid API key. Please check your API key configuration.');
     }
     
+    throw error;
+  }
+}
+
+/**
+ * Fetch files from a specific folder (public) with pagination
+ * @param {string} folderId
+ * @param {string} searchTerm
+ * @param {number} pageSize
+ * @param {string|undefined} pageToken
+ * @returns {Promise<{files: any[], nextPageToken: string|null}>}
+ */
+async function getFilesFromFolderPublicPaged(folderId, searchTerm = '', pageSize = 24, pageToken = undefined) {
+  try {
+    const cacheKey = `public_paged_${folderId}_${searchTerm}_${pageSize}_${pageToken || 'first'}`;
+    const cached = getCachedData(cacheKey);
+    if (cached) return cached;
+
+    let query = `'${folderId}' in parents and trashed = false`;
+    if (searchTerm) {
+      query += ` and name contains '${searchTerm}'`;
+    }
+
+    const response = await withTimeout(publicDrive.files.list({
+      q: query,
+      fields: 'nextPageToken, files(id, name, mimeType, size, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink)',
+      orderBy: 'name',
+      pageSize,
+      pageToken
+    }), 8000);
+
+    const files = response.data.files || [];
+    const nextPageToken = response.data.nextPageToken || null;
+    const result = { files, nextPageToken };
+    setCachedData(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error('Error fetching files from folder (public, paged):', error);
     throw error;
   }
 }
@@ -393,7 +471,9 @@ async function getPublicPdfResponse(fileId, rangeHeader) {
 
 module.exports = {
   getFilesFromFolderPublic,
+  getFilesFromFolderPublicPaged,
   getFilesFromFolderPrivate,
+  getFilesFromFolderPrivatePaged,
   getFileDetailsPublic,
   getFileDetailsPrivate,
   getFolderPath,
