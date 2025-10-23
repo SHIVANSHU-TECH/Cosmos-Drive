@@ -23,6 +23,8 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [numPages, setNumPages] = useState(0);
   const [pageNumber, setPageNumber] = useState(1);
+  const [isRendering, setIsRendering] = useState(false);
+  const [pendingPageNumber, setPendingPageNumber] = useState<number | null>(null);
   const [scale, setScale] = useState(1.0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +94,14 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
         pdfRef.current.destroy();
       }
     };
-  }, [fileUrl, pageNumber]);
+  }, [fileUrl]);
+
+  // Re-render page when pageNumber changes without reloading the document
+  useEffect(() => {
+    if (pdfRef.current) {
+      renderPage(pageNumber);
+    }
+  }, [pageNumber]);
 
   const loadPdf = async () => {
     try {
@@ -100,103 +109,38 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
       setError(null);
       console.log('Loading PDF from URL:', fileUrl);
       
-      // For PDF proxy URLs, we need to extract the file ID and use our API utility
-      if (fileUrl.startsWith('/api/private/drive/pdf/') || fileUrl.startsWith('/api/public/drive/pdf/')) {
-        const fileId = fileUrl.split('/').pop();
-        if (!fileId) {
-          throw new Error('Invalid PDF URL');
+      // Build absolute URL for pdf.js so it can use HTTP range requests
+      const backendUrl = getBackendUrl();
+      const absoluteUrl = fileUrl.startsWith('/api/') ? `${backendUrl}${fileUrl}` : fileUrl;
+
+      // Prepare optional auth header for private route
+      const httpHeaders: Record<string, string> = {};
+      if (fileUrl.startsWith('/api/private/drive/pdf/')) {
+        if (!token) {
+          throw new Error('Authentication required to view this PDF. Please log in to access this feature.');
         }
-      
-        // Fetch PDF using our API utility function
-        const backendUrl = getBackendUrl();
-        const url = `${backendUrl}${fileUrl}`;
-      
-        const headers: Record<string, string> = {};
-        // Add authorization header only for private routes
-        if (fileUrl.startsWith('/api/private/drive/pdf/')) {
-          if (!token) {
-            throw new Error('Authentication required to view this PDF. Please log in to access this feature.');
-          }
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-      
-        const response = await fetch(url, { headers });
-      
-        if (!response.ok) {
-          let errorMessage = `Failed to fetch PDF: ${response.status} ${response.statusText}`;
-          
-          // Try to get error details from response
-          try {
-            const errorData = await response.json();
-            if (errorData.error) {
-              errorMessage = errorData.error;
-            }
-          } catch (e) {
-            // Ignore JSON parsing errors
-          }
-          
-          if (response.status === 401 || response.status === 403) {
-            throw new Error('Access denied. Please log in to view this PDF.');
-          } else if (response.status === 400) {
-            throw new Error(errorMessage || 'Invalid file type. Only PDF files can be previewed.');
-          } else if (response.status === 404) {
-            throw new Error('PDF file not found.');
-          } else if (response.status === 500) {
-            throw new Error('Server error occurred while fetching the PDF. Please try again later.');
-          }
-          throw new Error(errorMessage);
-        }
-      
-        // Load PDF with the response
-        const loadingTask = pdfjsLib.getDocument({
-          data: await response.arrayBuffer()
-        });
-      
-        // Add progress tracking
-        loadingTask.onProgress = (progress: { loaded: number; total: number }) => {
-          console.log('PDF loading progress:', progress);
-        };
-      
-        const pdf = await loadingTask.promise;
-        pdfRef.current = pdf;
-        setNumPages(pdf.numPages);
-        console.log('PDF loaded with', pdf.numPages, 'pages');
-      
-        // Set initial scale based on device
-        const initialScale = isMobile ? 0.8 : 1.0;
-        setScale(initialScale);
-      
-        renderPage(pageNumber);
-      } else {
-        // For direct URLs, use the existing method
-        // Prepare HTTP headers with authentication token
-        const httpHeaders: Record<string, string> = {};
-        if (token) {
-          httpHeaders['Authorization'] = `Bearer ${token}`;
-        }
-      
-        // Load PDF with authentication headers
-        const loadingTask = pdfjsLib.getDocument({
-          url: fileUrl,
-          httpHeaders
-        });
-      
-        // Add progress tracking
-        loadingTask.onProgress = (progress: { loaded: number; total: number }) => {
-          console.log('PDF loading progress:', progress);
-        };
-      
-        const pdf = await loadingTask.promise;
-        pdfRef.current = pdf;
-        setNumPages(pdf.numPages);
-        console.log('PDF loaded with', pdf.numPages, 'pages');
-      
-        // Set initial scale based on device
-        const initialScale = isMobile ? 0.8 : 1.0;
-        setScale(initialScale);
-      
-        renderPage(pageNumber);
+        httpHeaders['Authorization'] = `Bearer ${token}`;
       }
+
+      // Let pdf.js fetch with URL so it can do byte-range streaming
+      const loadingTask = pdfjsLib.getDocument({
+        url: absoluteUrl,
+        httpHeaders
+      });
+
+      loadingTask.onProgress = (progress: { loaded: number; total: number }) => {
+        // Optional: could gate with NODE_ENV/quiet if needed
+        // console.log('PDF loading progress:', progress);
+      };
+
+      const pdf = await loadingTask.promise;
+      pdfRef.current = pdf;
+      setNumPages(pdf.numPages);
+      
+      const initialScale = isMobile ? 0.8 : 1.0;
+      setScale(initialScale);
+      
+      renderPage(pageNumber);
     } catch (err) {
       const errorMessage = 'Failed to load PDF: ' + (err instanceof Error ? err.message : 'Unknown error');
       setError(errorMessage);
@@ -216,6 +160,7 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
     
     try {
       console.log('Rendering page', pageNum);
+      setIsRendering(true);
       
       // Cancel any ongoing render operations
       if (pdfRef.current.renderTask) {
@@ -253,27 +198,45 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
       
       await renderTask.promise;
       console.log('Page rendered successfully');
+      setIsRendering(false);
+      // If there is a pending page request, render that next (only latest wins)
+      if (pendingPageNumber !== null && pendingPageNumber !== pageNum) {
+        const nextPage = Math.min(Math.max(pendingPageNumber, 1), numPages);
+        setPendingPageNumber(null);
+        setPageNumber(nextPage);
+        // renderPage will be triggered by the pageNumber effect
+      }
     } catch (err) {
       // Ignore cancellation errors as they're expected when switching pages quickly
       if (err instanceof Error && err.name === 'RenderingCancelledException') {
         console.log('Rendering cancelled for page', pageNum);
+        setIsRendering(false);
         return;
       }
       
       const errorMessage = 'Failed to render page: ' + (err instanceof Error ? err.message : 'Unknown error');
       setError(errorMessage);
       console.error('Page rendering error:', err);
+      setIsRendering(false);
     }
   };
 
   const goToPrevPage = () => {
     if (pageNumber <= 1) return;
-    setPageNumber(pageNumber - 1);
+    if (isRendering) {
+      setPendingPageNumber(pageNumber - 1);
+    } else {
+      setPageNumber(pageNumber - 1);
+    }
   };
 
   const goToNextPage = () => {
     if (pageNumber >= numPages) return;
-    setPageNumber(pageNumber + 1);
+    if (isRendering) {
+      setPendingPageNumber(pageNumber + 1);
+    } else {
+      setPageNumber(pageNumber + 1);
+    }
   };
 
   const zoomIn = () => {
