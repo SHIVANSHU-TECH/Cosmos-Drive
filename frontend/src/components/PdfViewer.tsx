@@ -330,22 +330,27 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
             <div className="flex items-center gap-2">
               <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Zoom:</span>
               <button
+                onClick={zoomOut}
+                className={`px-3 py-2 text-sm rounded-lg ${darkMode ? 'bg-gray-700 border border-gray-600 text-white hover:bg-gray-600' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                aria-label="Zoom out"
+              >
+                −
+              </button>
+              <span className={`px-3 py-2 text-sm rounded-lg ${darkMode ? 'bg-gray-700 border border-gray-600 text-white' : 'bg-white border border-gray-300 text-gray-700'}`}>
+                {Math.round(scale * 100)}%
+              </span>
+              <button
+                onClick={zoomIn}
+                className={`px-3 py-2 text-sm rounded-lg ${darkMode ? 'bg-gray-700 border border-gray-600 text-white hover:bg-gray-600' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                aria-label="Zoom in"
+              >
+                +
+              </button>
+              <button
                 onClick={() => setScale(1.0)}
                 className={`px-3 py-2 text-sm rounded-lg ${scale === 1.0 ? 'bg-blue-600 text-white' : (darkMode ? 'bg-gray-700 border border-gray-600 text-white hover:bg-gray-600' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50')}`}
               >
-                100%
-              </button>
-              <button
-                onClick={() => setScale(1.25)}
-                className={`px-3 py-2 text-sm rounded-lg ${scale === 1.25 ? 'bg-blue-600 text-white' : (darkMode ? 'bg-gray-700 border border-gray-600 text-white hover:bg-gray-600' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50')}`}
-              >
-                125%
-              </button>
-              <button
-                onClick={() => setScale(1.5)}
-                className={`px-3 py-2 text-sm rounded-lg ${scale === 1.5 ? 'bg-blue-600 text-white' : (darkMode ? 'bg-gray-700 border border-gray-600 text-white hover:bg-gray-600' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50')}`}
-              >
-                150%
+                Reset
               </button>
             </div>
           )}
