@@ -67,12 +67,12 @@ function EmbedPageContent() {
     } else if (theme === 'light') {
       setDarkMode(false);
     } else {
-      // Check for dark mode preference in localStorage or system preference
-      const savedDarkMode = localStorage.getItem('darkMode');
+      let savedDarkMode: string | null = null;
+      try { savedDarkMode = localStorage.getItem('darkMode'); } catch {}
       if (savedDarkMode !== null) {
         setDarkMode(savedDarkMode === 'true');
       } else {
-        const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const systemPrefersDark = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : false;
         setDarkMode(systemPrefersDark);
       }
     }
@@ -92,8 +92,7 @@ function EmbedPageContent() {
     } else {
       document.body.classList.remove('dark');
     }
-    // Save preference to localStorage
-    localStorage.setItem('darkMode', darkMode.toString());
+    try { localStorage.setItem('darkMode', darkMode.toString()); } catch {}
   }, [darkMode]);
 
   // Fetch files when currentFolderId changes
@@ -749,11 +748,12 @@ function EmbedPageLoading() {
   
   useEffect(() => {
     // Check for dark mode preference
-    const savedDarkMode = localStorage.getItem('darkMode');
+    let savedDarkMode: string | null = null;
+    try { savedDarkMode = localStorage.getItem('darkMode'); } catch {}
     if (savedDarkMode !== null) {
       setDarkMode(savedDarkMode === 'true');
     } else {
-      const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const systemPrefersDark = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : false;
       setDarkMode(systemPrefersDark);
     }
   }, []);
@@ -783,11 +783,12 @@ function EmbedPageError({ error }: { error: string }) {
   
   useEffect(() => {
     // Check for dark mode preference
-    const savedDarkMode = localStorage.getItem('darkMode');
+    let savedDarkMode: string | null = null;
+    try { savedDarkMode = localStorage.getItem('darkMode'); } catch {}
     if (savedDarkMode !== null) {
       setDarkMode(savedDarkMode === 'true');
     } else {
-      const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const systemPrefersDark = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : false;
       setDarkMode(systemPrefersDark);
     }
   }, []);
