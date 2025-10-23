@@ -258,86 +258,68 @@ app.get('/api/private/drive/thumbnail/:fileId', authenticateToken, async (req, r
   }
 });
 
-// Public PDF proxy route (no authentication required for public files)
+// Public PDF proxy route (no authentication required) with Range support
 app.get('/api/public/drive/pdf/:fileId', async (req, res) => {
   try {
     const { fileId } = req.params;
-    
-    console.log('Public PDF proxy request for file ID:', fileId);
-    
-    // Check if API_KEY is available
+    const range = req.headers.range; // e.g., 'bytes=0-'
+
+    console.log('Public PDF proxy request for file ID:', fileId, 'Range:', range || 'none');
+
+    // Validate API key presence (Drive access)
     if (!API_KEY) {
       console.error('API_KEY is not configured');
       return res.status(500).json({ error: 'Server configuration error: API key not available' });
     }
-    
-    // Use public drive client
-    const drive = google.drive({
-      version: 'v3',
-      auth: API_KEY
-    });
-    
-    // First, get the file metadata to check if it's a PDF
-    console.log('Fetching file metadata for ID:', fileId);
+
+    // Verify file is a PDF (lightweight metadata call)
+    const drive = google.drive({ version: 'v3', auth: API_KEY });
     const metadataResponse = await drive.files.get({
-      fileId: fileId,
-      fields: 'name, mimeType, webContentLink'
+      fileId,
+      fields: 'mimeType'
     });
-    
-    const fileMetadata = metadataResponse.data;
-    console.log('File metadata:', fileMetadata);
-    
-    // Check if it's actually a PDF file
-    if (fileMetadata.mimeType !== 'application/pdf') {
-      console.log('File is not a PDF:', fileMetadata.mimeType);
+    const mime = metadataResponse.data?.mimeType;
+    if (mime !== 'application/pdf') {
       return res.status(400).json({ error: 'File is not a PDF' });
     }
-    
-    // Set appropriate headers for PDF
+
+    // Fetch stream from Drive with optional Range header via service helper
+    const { getPublicPdfResponse } = require('./backend/services/driveService');
+    const upstream = await getPublicPdfResponse(fileId, range);
+
+    // Forward relevant headers for byte-range streaming
     res.set('Content-Type', 'application/pdf');
-    res.set('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
-    
-    // Use the Google Drive API to get the file content directly as a stream
-    console.log('Fetching PDF content directly from Google Drive API');
-    const pdfResponse = await drive.files.get(
-      {
-        fileId: fileId,
-        alt: 'media'
-      },
-      {
-        responseType: 'stream'
-      }
-    );
-    
-    console.log('Streaming PDF content to client via direct API');
-    
-    // Handle stream events
-    pdfResponse.data.on('error', (err) => {
+    res.set('Accept-Ranges', 'bytes');
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+    const headers = upstream.headers || {};
+    if (headers['content-length']) res.set('Content-Length', headers['content-length']);
+    if (headers['content-range']) res.set('Content-Range', headers['content-range']);
+
+    // Status 206 for partial content when Range requested
+    if (range && headers['content-range']) {
+      res.status(206);
+    } else {
+      res.status(200);
+    }
+
+    upstream.data.on('error', (err) => {
       console.error('Error streaming PDF:', err);
       if (!res.headersSent) {
-        res.status(500).json({ error: 'Failed to stream PDF: ' + err.message });
+        res.status(502).json({ error: 'Upstream PDF stream failed' });
+      } else {
+        res.destroy();
       }
     });
-    
-    // Pipe the PDF stream to the response
-    pdfResponse.data.pipe(res);
+
+    upstream.data.pipe(res);
   } catch (error) {
     console.error('Error proxying public PDF for file ID:', req.params.fileId, error);
-    
-    // Handle specific error cases
-    if (error.code === 404) {
-      return res.status(404).json({ error: 'PDF file not found' });
-    } else if (error.code === 403) {
-      return res.status(403).json({ error: 'Access denied to PDF file. File may not be publicly accessible.' });
-    } else if (error.code === 401) {
-      return res.status(401).json({ error: 'Invalid API key' });
-    } else if (error.code === 400) {
-      return res.status(400).json({ error: 'Invalid file type. Only PDF files can be previewed.' });
-    }
-    
-    // Check if headers have already been sent
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Failed to proxy PDF: ' + error.message });
+      if (error.code === 404) return res.status(404).json({ error: 'PDF file not found' });
+      if (error.code === 403) return res.status(403).json({ error: 'Access denied to PDF file. File may not be publicly accessible.' });
+      if (error.code === 401) return res.status(401).json({ error: 'Invalid API key' });
+      if (error.code === 400) return res.status(400).json({ error: 'Invalid file type. Only PDF files can be previewed.' });
+      return res.status(500).json({ error: 'Failed to proxy PDF: ' + error.message });
     }
   }
 });
