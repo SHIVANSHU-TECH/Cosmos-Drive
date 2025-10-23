@@ -148,14 +148,12 @@ function getAuthenticatedDrive(accessToken) {
  * Fetch files from a specific folder (public access)
  * @param {string} folderId - The ID of the Google Drive folder
  * @param {string} searchTerm - Optional search term to filter files
- * @param {number} pageSize - Number of files to return per page
- * @param {string} pageToken - Token for the next page of results
- * @returns {Promise<Object>} - Object with files and nextPageToken
+ * @returns {Promise<Array>} - Array of file objects
  */
-async function getFilesFromFolderPublic(folderId, searchTerm = '', pageSize = 50, pageToken = undefined) {
+async function getFilesFromFolderPublic(folderId, searchTerm = '') {
   try {
     // Check cache first
-    const cacheKey = `public_${folderId}_${searchTerm}_${pageSize}_${pageToken || 'first'}`;
+    const cacheKey = `public_${folderId}_${searchTerm}`;
     const cachedData = getCachedData(cacheKey);
     if (cachedData) {
       console.log('Returning cached data for folder:', folderId);
@@ -172,21 +170,16 @@ async function getFilesFromFolderPublic(folderId, searchTerm = '', pageSize = 50
     // Add timeout to Google Drive operation (8 seconds for better performance)
     const response = await withTimeout(publicDrive.files.list({
       q: query,
-      fields: 'nextPageToken, files(id, name, mimeType, size, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink)',
-      orderBy: 'name',
-      pageSize,
-      pageToken
+      fields: 'files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, owners(displayName, emailAddress), permissions, parents)',
+      orderBy: 'name'
     }), 8000);
     
     const files = response.data.files || [];
-    const nextPageToken = response.data.nextPageToken || null;
-    
-    const result = { files, nextPageToken };
     
     // Cache the results
-    setCachedData(cacheKey, result);
+    setCachedData(cacheKey, files);
     
-    return result;
+    return files;
   } catch (error) {
     console.error('Error fetching files from folder (public):', error);
     
@@ -208,14 +201,12 @@ async function getFilesFromFolderPublic(folderId, searchTerm = '', pageSize = 50
  * @param {string} accessToken - User's OAuth access token
  * @param {string} folderId - The ID of the Google Drive folder
  * @param {string} searchTerm - Optional search term to filter files
- * @param {number} pageSize - Number of files to return per page
- * @param {string} pageToken - Token for the next page of results
- * @returns {Promise<Object>} - Object with files and nextPageToken
+ * @returns {Promise<Array>} - Array of file objects
  */
-async function getFilesFromFolderPrivate(accessToken, folderId, searchTerm = '', pageSize = 50, pageToken = undefined) {
+async function getFilesFromFolderPrivate(accessToken, folderId, searchTerm = '') {
   try {
     // Check cache first
-    const cacheKey = `private_${folderId}_${accessToken.substring(0, 10)}_${searchTerm}_${pageSize}_${pageToken || 'first'}`;
+    const cacheKey = `private_${folderId}_${accessToken.substring(0, 10)}_${searchTerm}`;
     const cachedData = getCachedData(cacheKey);
     if (cachedData) {
       console.log('Returning cached data for private folder:', folderId);
@@ -234,21 +225,16 @@ async function getFilesFromFolderPrivate(accessToken, folderId, searchTerm = '',
     // Add timeout to Google Drive operation (8 seconds for better performance)
     const response = await withTimeout(drive.files.list({
       q: query,
-      fields: 'nextPageToken, files(id, name, mimeType, size, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink)',
-      orderBy: 'name',
-      pageSize,
-      pageToken
+      fields: 'files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, thumbnailLink, iconLink, owners(displayName, emailAddress), permissions, parents)',
+      orderBy: 'name'
     }), 8000);
     
     const files = response.data.files || [];
-    const nextPageToken = response.data.nextPageToken || null;
-    
-    const result = { files, nextPageToken };
     
     // Cache the results
-    setCachedData(cacheKey, result);
+    setCachedData(cacheKey, files);
     
-    return result;
+    return files;
   } catch (error) {
     console.error('Error fetching files from folder (private):', error);
     throw error;
