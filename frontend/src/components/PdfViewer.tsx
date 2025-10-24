@@ -105,7 +105,7 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
 
   // Re-render when zoom scale changes (desktop only)
   useEffect(() => {
-    if (pdfRef.current && !isMobile) {
+    if (pdfRef.current) {
       renderPage(pageNumber);
     }
   }, [scale]);
@@ -185,7 +185,7 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
       const widthScale = (containerWidth * 0.98) / viewport.width;
       const heightScale = (containerHeight * 0.98) / viewport.height;
       const fitScale = Math.min(widthScale, heightScale);
-      const userScale = isMobile ? 1 : scale; // apply zoom only on non-mobile
+      const userScale = scale;
       const finalScale = fitScale * userScale;
       console.log('Container WxH:', containerWidth, 'x', containerHeight, 'Viewport WxH:', viewport.width, 'x', viewport.height, 'Scale W/H:', widthScale, heightScale, 'Final:', finalScale);
       
@@ -257,6 +257,64 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
 
   const zoomOut = () => {
     setScale(prev => Math.max(prev / 1.2, 0.2));
+  };
+
+  const lastTapRef = useRef<number | null>(null);
+  const pinchStartDistanceRef = useRef<number | null>(null);
+  const startXRef = useRef<number | null>(null);
+  const isSwipingRef = useRef<boolean>(false);
+
+  const distance = (t1: any, t2: any) => {
+    const dx = t1.clientX - t2.clientX;
+    const dy = t1.clientY - t2.clientY;
+    return Math.hypot(dx, dy);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!isMobile) return;
+    if (e.touches.length === 2) {
+      pinchStartDistanceRef.current = distance(e.touches[0], e.touches[1]);
+    } else if (e.touches.length === 1) {
+      startXRef.current = e.touches[0].clientX;
+      isSwipingRef.current = true;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isMobile) return;
+    if (e.touches.length === 2 && pinchStartDistanceRef.current) {
+      const newDist = distance(e.touches[0], e.touches[1]);
+      const ratio = newDist / pinchStartDistanceRef.current;
+      setScale(prev => Math.min(Math.max(prev * ratio, 0.5), 3));
+      pinchStartDistanceRef.current = newDist;
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!isMobile) return;
+    if (e.changedTouches.length === 1 && isSwipingRef.current && startXRef.current !== null) {
+      const endX = e.changedTouches[0].clientX;
+      const dx = endX - startXRef.current;
+      const threshold = 50;
+      if (dx > threshold) {
+        goToPrevPage();
+      } else if (dx < -threshold) {
+        goToNextPage();
+      }
+    }
+    isSwipingRef.current = false;
+    startXRef.current = null;
+  };
+
+  const handleDoubleTap = () => {
+    if (!isMobile) return;
+    const now = Date.now();
+    if (lastTapRef.current && now - lastTapRef.current < 300) {
+      setScale(prev => (prev < 1.2 ? 1.5 : 1.0));
+      lastTapRef.current = null;
+    } else {
+      lastTapRef.current = now;
+    }
   };
 
   // Don't render anything during SSR
@@ -357,7 +415,12 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
         </div>
         
         {/* PDF Content */}
-        <div className={`flex-1 overflow-auto p-2 sm:p-4 ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+        <div className={`flex-1 overflow-auto p-2 sm:p-4 ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}
+             onTouchStart={handleTouchStart}
+             onTouchMove={handleTouchMove}
+             onTouchEnd={handleTouchEnd}
+             onClick={handleDoubleTap}
+        >
           {loading && (
             <div className="flex justify-center items-center h-64">
               <div className="text-center">
@@ -401,7 +464,7 @@ export default function PdfViewer({ fileUrl, fileName, onClose }: PdfViewerProps
           )}
           
           <div className="flex justify-center">
-            <div className="w-full md:w-11/12 lg:w-4/5 xl:w-3/5 2xl:w-1/2 max-w-[1100px] h-[85vh] flex items-start justify-center mx-auto overflow-auto">
+            <div className="w-full md:w-11/12 lg:w-4/5 xl:w-3/5 2xl:w-1/2 max-w-[1100px] h-[85vh] flex items-start justify-center mx-auto overflow-auto touch-none">
               <canvas ref={canvasRef} className="shadow-lg bg-white rounded-lg" />
             </div>
           </div>
