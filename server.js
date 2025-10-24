@@ -70,11 +70,25 @@ const API_KEY = process.env.GOOGLE_API_KEY;
 
 console.log('API_KEY:', API_KEY ? 'SET' : 'NOT SET');
 
-// Configure CORS to allow requests from CollegeXConnect
+// Configure CORS to allow requests from allowed frontends and custom headers for API key auth
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001,https://collegexconnect.com,https://www.collegexconnect.com,https://cosmos-drive.vercel.app')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
 const corsOptions = {
-  origin: ['http://localhost:3000', 'https://collegexconnect.com', 'https://www.collegexconnect.com', 'https://cosmos-drive.vercel.app'],
+  origin: function(origin, callback) {
+    // allow non-browser requests or same-origin with no Origin header
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 204,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-api-key', 'X-API-Key', 'X-Api-Key', 'x-cron-secret']
 };
 
 app.use(cors(corsOptions));
@@ -182,6 +196,51 @@ app.get('/api/public/drive/thumbnail/:fileId', async (req, res) => {
   }
 });
 
+// Minimal secure cron endpoint scaffold (for Render Cron Jobs)
+app.post('/api/tasks/cron', async (req, res) => {
+  try {
+    const secret = process.env.CRON_SECRET;
+    const provided = req.headers['x-cron-secret'];
+    if (!secret || provided !== secret) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Warm endpoints to keep the service responsive and caches hot
+    const base = process.env.BACKEND_BASE_URL || (req.headers['x-forwarded-proto'] ? `${req.headers['x-forwarded-proto']}://${req.headers.host}` : `https://${req.headers.host}`);
+    const warmList = (process.env.WARM_ENDPOINTS || '').split(',').map(s => s.trim()).filter(Boolean);
+    const apiKey = process.env.WARM_API_KEY;
+
+    const results = await Promise.allSettled(warmList.map(async (p) => {
+      const url = /^https?:\/\//i.test(p) ? p : `${base}${p.startsWith('/') ? p : `/${p}`}`;
+      const headers = {
+        'User-Agent': 'CosmosDriveWarmup/1.0'
+      };
+      if (apiKey && /\/api\/embed\//.test(url)) {
+        headers['X-API-Key'] = apiKey;
+      }
+      const resp = await fetch(url, { method: 'GET', headers });
+      return { url, status: resp.status };
+    }));
+
+    const summary = {
+      ok: results.filter(r => r.status === 'fulfilled' && r.value.status >= 200 && r.value.status < 500).length,
+      total: results.length,
+      details: results.map(r => r.status === 'fulfilled' ? r.value : { error: r.reason?.message || 'failed' })
+    };
+
+    return res.status(200).json({ ok: true, summary });
+  } catch (e) {
+    console.error('Cron task error', e);
+    return res.status(500).json({ error: 'Cron task failed' });
+  }
+});
+
+// Lightweight health endpoint for uptime checks
+app.get('/health', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.status(200).json({ status: 'ok', time: new Date().toISOString() });
+});
+
 // Private thumbnail proxy route (authentication required)
 app.get('/api/private/drive/thumbnail/:fileId', authenticateToken, async (req, res) => {
   try {
@@ -272,6 +331,8 @@ app.get('/api/public/drive/pdf/:fileId', async (req, res) => {
   try {
     const { fileId } = req.params;
     const range = req.headers.range; // e.g., 'bytes=0-'
+    const ifNoneMatch = req.headers['if-none-match'];
+    const ifModifiedSince = req.headers['if-modified-since'];
 
     console.log('Public PDF proxy request for file ID:', fileId, 'Range:', range || 'none');
 
@@ -294,21 +355,31 @@ app.get('/api/public/drive/pdf/:fileId', async (req, res) => {
 
     // Fetch stream from Drive with optional Range header via service helper
     const { getPublicPdfResponse } = require('./backend/services/driveService');
-    const upstream = await getPublicPdfResponse(fileId, range);
+    const upstream = await getPublicPdfResponse(fileId, range, {
+      ifNoneMatch: Array.isArray(ifNoneMatch) ? ifNoneMatch[0] : ifNoneMatch,
+      ifModifiedSince: Array.isArray(ifModifiedSince) ? ifModifiedSince[0] : ifModifiedSince,
+    });
 
     // Forward relevant headers for byte-range streaming
     res.set('Content-Type', 'application/pdf');
     res.set('Accept-Ranges', 'bytes');
-    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+    // Prefer long-lived caching for public PDFs
+    res.set('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
     const headers = upstream.headers || {};
     if (headers['content-length']) res.set('Content-Length', headers['content-length']);
     if (headers['content-range']) res.set('Content-Range', headers['content-range']);
+    if (headers['etag']) res.set('ETag', headers['etag']);
+    if (headers['last-modified']) res.set('Last-Modified', headers['last-modified']);
 
     // Status 206 for partial content when Range requested
+    // Respect upstream status including 304 Not Modified
+    if (upstream.status === 304) {
+      return res.status(304).end();
+    }
     if (range && headers['content-range']) {
       res.status(206);
     } else {
-      res.status(200);
+      res.status(upstream.status || 200);
     }
 
     upstream.data.on('error', (err) => {
