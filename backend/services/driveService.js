@@ -447,7 +447,7 @@ async function getPublicPdfContent(fileId) {
  * @param {string} [rangeHeader]
  * @returns {Promise<Object>} - Axios-like response with data (stream) and headers
  */
-async function getPublicPdfResponse(fileId, rangeHeader) {
+async function getPublicPdfResponse(fileId, rangeHeader, conditionalHeaders) {
   try {
     const response = await withTimeout(
       publicDrive.files.get(
@@ -457,7 +457,11 @@ async function getPublicPdfResponse(fileId, rangeHeader) {
         },
         {
           responseType: 'stream',
-          headers: rangeHeader ? { Range: rangeHeader } : undefined
+          headers: {
+            ...(rangeHeader ? { Range: rangeHeader } : {}),
+            ...(conditionalHeaders?.ifNoneMatch ? { 'If-None-Match': conditionalHeaders.ifNoneMatch } : {}),
+            ...(conditionalHeaders?.ifModifiedSince ? { 'If-Modified-Since': conditionalHeaders.ifModifiedSince } : {})
+          }
         }
       ),
       15000
